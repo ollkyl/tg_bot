@@ -2,6 +2,7 @@
 .venv/
 venv/
 env/
+.env
 
 # Кэшированные файлы Python
 __pycache__/
@@ -20,3 +21,4 @@ Thumbs.db
 
 # Временные файлы
 *.tmp
+*.session
