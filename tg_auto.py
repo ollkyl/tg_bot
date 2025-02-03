@@ -1,40 +1,38 @@
 from telethon import TelegramClient
-from dotenv import load_dotenv
+from dotenv import load_dotenv, dotenv_values
+
 import os
 import asyncio
 
-load_dotenv()
+env_values = dotenv_values(".env")  # Загружаем .env в виде словаря
+print(f"API_ID из dotenv_values: {env_values.get('API_ID')}")
 
 api_id = os.getenv("API_ID")
 api_hash = os.getenv("API_HASH")
-phone = os.getenv("PHONE_NUMBER")
+print(f"API_ID из .env: {api_id}")
+
+# Группа, куда будем пересылать сообщение
+channels = ["Zelenogradk"]
 
 
-# Список ID каналов и групп
-channels = [
-    "Zelenogradk",  # Группа по username
-]
-
-# ID сообщения, которое нужно переслать
-message_id = 123456  #  ID сообщения, которое нужно переслать
-personal_chat = "me"  # Личный чат, из которого будем пересылать сообщение
-
-
-async def send_posts():
+async def send_latest_post():
     async with TelegramClient("session_name", api_id, api_hash) as client:
-        # 1. Пересылаем сообщение из личного чата в группы
-        for channel in channels:
-            try:
-                # Пересылаем сообщение с указанным ID
-                await client.forward_messages(
-                    channel, message_id, from_peer=personal_chat
-                )
+        # Получаем последнее сообщение из "Saved Messages"
+        saved_messages = await client.get_messages("me", limit=1)
 
-                print(f"✅ Пост отправлен в {channel}")
-                await asyncio.sleep(3670)  # Пауза между отправками
-            except Exception as e:
-                print(f"❌ Ошибка отправки в {channel}: {e}")
+        if saved_messages:
+            message = saved_messages[0]  # Берем последнее сообщение
+
+            for channel in channels:
+                try:
+                    await client.forward_messages(channel, message)
+                    print(f"✅ Пост отправлен в {channel}")
+                    await asyncio.sleep(3670)  # Пауза между отправками
+                except Exception as e:
+                    print(f"❌ Ошибка отправки в {channel}: {e}")
+        else:
+            print("❌ Нет сообщений в сохраненном чате.")
 
 
 if __name__ == "__main__":
-    asyncio.run(send_posts())
+    asyncio.run(send_latest_post())
