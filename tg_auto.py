@@ -46,27 +46,8 @@ channels_with_photos = [
     "ChatYDubai",
     "UAEDubai_Realty",
     "dubai_cha",
-    "arenda_dubai_oae",
+    "dubaichat_rusarenda_dubai_oae",
     "dubai_chat_1",
-    "arenda_dubaysk",
-    "DubaiBaraholaka",
-    "dubai_uae",
-    "dubai_diamond",
-    "dubai_helps",
-    "dubaichat_rus",
-    "russians_in_dubaii",
-    "ads_dubai",
-    "inspacesDubaiRent",
-    "dubai_rentt",
-    "myhomeindubai",
-    "arenda_dubaii",
-    "dubai_appart",
-    "rentapartment_dubai_uae",
-    "homes_dubai",
-    "dubaysk_arenda",
-    "dubai_rent_uae",
-    "dubai_propertyy",
-    "uae_apartments_rent",
 ]  # Сюда пересылаем только сообщения с фото
 
 channels_without_photos = [
@@ -79,22 +60,6 @@ channels_without_photos = [
     "depaldo_chat",
     "dubai_dlya_svoih",
     "dubai_chat_biznes",
-    "Kazakhstan_dubai_uae",
-    "Dubaydagi_Uzbeklarr",
-    "dubai_baraxolka",
-    "dirham_dubai",
-    "dubaiApartments1",
-    "ryska_Dubai",
-    "dubai_barakholka",
-    "dubai_ukraine",
-    "dubai_chat_russians",
-    "kyrgyzy_v_dubaee",
-    "reklamadlyavsehuae",
-    "dubaiclubgirls",
-    "dubai_uae_oae_russkiye_v_dubae",
-    "dubaichatik1",
-    "kazakhcommunityuae",
-    "kyrgysz_in_dubai",
     "uazbekindubai",
     "dubaionline247",
     "sharjashat",
@@ -108,48 +73,75 @@ async def send_latest_posts():
         while True:
             saved_messages = await client.get_messages(
                 "me", limit=20
-            )  # Берем последние 20 сообщений
+            )  # Берём 20 последних сообщений
 
             if not saved_messages:
                 print("⚠ Нет новых сообщений в сохраненных.")
-                await asyncio.sleep(
-                    30
-                )  # Если сообщений нет, ждем 30 сек и пробуем снова
+                await asyncio.sleep(30)  # Ждём 30 сек перед следующей проверкой
                 continue
 
-            messages_with_photos = [msg for msg in saved_messages if msg.media]
-            messages_without_photos = [msg for msg in saved_messages if not msg.media]
+            albums = {}  # Словарь для группировки сообщений по grouped_id
+            individual_messages = []  # Сообщения без группировки
 
-            while messages_with_photos and messages_without_photos:
-                photo_msg = messages_with_photos.pop(0)  # Берем одно сообщение с фото
-                text_msg = messages_without_photos.pop(
-                    0
-                )  # Берем одно текстовое сообщение
+            # Группируем сообщения
+            for msg in saved_messages:
+                if msg.grouped_id:
+                    albums.setdefault(msg.grouped_id, []).append(msg)
+                else:
+                    # Если сообщение содержит медиа (не важно одно или альбом)
+                    if msg.media:
+                        individual_messages.append(msg)  # Это медиа-сообщение
+                    else:
+                        individual_messages.append(
+                            msg
+                        )  # Это текстовое сообщение без медиа
 
-                await asyncio.gather(
-                    send_to_channels(client, channels_with_photos, photo_msg),
-                    send_to_channels(client, channels_without_photos, text_msg),
-                )
+            # Пересылаем альбомы
+            for album in albums.values():
+                await forward_album(client, channels_with_photos, album)
 
-                print("⏳ Пауза 30 секунд перед следующей парой сообщений...")
-                await asyncio.sleep(30)  # Пауза после отправки пары сообщений
+            # Пересылаем обычные сообщения
+            for msg in individual_messages:
+                if msg.media:  # Если медиа, то пересылаем как в channels_with_photos
+                    await forward_to_channels(client, channels_with_photos, msg)
+                else:  # Если это текстовое сообщение, то в channels_without_photos
+                    await forward_to_channels(client, channels_without_photos, msg)
 
-            print("⚠ Сообщения закончились. Ждем 30 секунд перед новой проверкой.")
-            await asyncio.sleep(
-                30
-            )  # Если сообщений не осталось, ждем перед новой проверкой
+            print("⚠ Ожидание 30 секунд перед новой проверкой...")
+            await asyncio.sleep(30)  # Ждём перед следующей проверкой
 
 
-async def send_to_channels(client, channels, message):
-    """Отправляет сообщение во все указанные каналы"""
+async def forward_album(client, channels, album):
+    """Пересылает весь альбом целиком (фото, видео) с текстом"""
+    # Находим сообщение с текстом (обычно он в последнем)
+    text = next((msg.message for msg in reversed(album) if msg.message), "")
+
+    media_group = [msg for msg in album]  # Все вложения из альбома
+
     for channel in channels:
         try:
-            await client.forward_messages(channel, message)
-            print(f"✅ Сообщение отправлено в {channel}")
+            await client.send_file(
+                channel,
+                [msg.media for msg in media_group],  # Отправляем весь альбом
+                caption=text if text else None,  # Добавляем текст, если он есть
+            )
+            print(f"✅ Альбом переслан в {channel}")
         except ChatWriteForbiddenError:
             print(f"❌ Нет прав на отправку в {channel}")
         except Exception as e:
-            print(f"❌ Ошибка отправки в {channel}: {e}")
+            print(f"❌ Ошибка пересылки в {channel}: {e}")
+
+
+async def forward_to_channels(client, channels, message):
+    """Пересылает одиночное сообщение"""
+    for channel in channels:
+        try:
+            await client.forward_messages(channel, message)
+            print(f"✅ Сообщение переслано в {channel}")
+        except ChatWriteForbiddenError:
+            print(f"❌ Нет прав на отправку в {channel}")
+        except Exception as e:
+            print(f"❌ Ошибка пересылки в {channel}: {e}")
 
 
 if __name__ == "__main__":
