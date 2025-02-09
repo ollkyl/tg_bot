@@ -59,6 +59,8 @@ async def handle_new_message(event):
     user_message = event.message.message
     sender = await event.get_sender()
     user_id = sender.id  # Получаем ID отправителя
+    if user_id < 0:
+        user_id = None
     print(f"Новое сообщение от {sender.username}: {user_message}")
 
     # Если это первое сообщение в диалоге, даем специальный ответ
@@ -76,14 +78,16 @@ async def handle_new_message(event):
         response = generate_response(user_id, prompt)
     else:
         response = generate_response(user_id, user_message)
+        entity = await client.get_entity(user_id)
 
         if "уточню у собственника" in response:
             await client.send_message(
-                "me", f"( клиент {client.get_entity(user_id)} ждет ответ собственника)"
+                "me",
+                f"( клиент @{entity.username} ждет ответ собственника)",
             )
-        if "вам удобно будет?" in response:
+        if "вам удобно будет?" in response or "вам удобно будет?" in response:
             await client.send_message(
-                "me", f"( клиент {client.get_entity(user_id)} ждет ответ собственника)"
+                "me", f"( клиент @{entity.username} ждет ответ собственника)"
             )
 
     # Отправляем ответ
