@@ -4,6 +4,7 @@ venv/
 env/
 .env
 photos/
+apartments.json
 
 # Кэшированные файлы Python
 __pycache__/
