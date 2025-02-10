@@ -3,6 +3,7 @@
 venv/
 env/
 .env
+photos/
 
 # Кэшированные файлы Python
 __pycache__/
