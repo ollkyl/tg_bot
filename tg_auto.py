@@ -14,31 +14,6 @@ channels_with_photos = [
     "sky_property",
     "dubai_yana_nedvizhimost",
     "my_dubai_chat",
-    "uae_talk_Dubai",
-    "realstate_in_dubai",
-    "hhjij8",
-    "Dubaichatlife",
-    "DubaiSP4",
-    "dubai_chat11",
-    "dubai_rr",
-    "uae_chat_travel",
-    "poisk_dubai",
-    "dubai_rus_chat",
-    "businessdealuae",
-    "vse_svoi_dubai",
-    "dubai_chat_rus",
-    "DubaiRentArenda",
-    "nedvij_dubai_chat",
-    "dubai_chat_ads",
-    "oae_realestate_dubai",
-    "chat_obmenka",
-    "DubaiCIAN",
-    "chatdubae",
-    "rent_dubai_apt",
-    "rent_dubai1",
-    "uae_brokers",
-    "dubaihome2",
-    "RealtyDubay",
     "realestate_dxb_uae",
     "dubaiapartments2022",
     "Roomydubai_group",
@@ -54,18 +29,20 @@ channels_without_photos = [
     "perviv_dubae",
     "tutdubai",
     "chatoae",
+    "krasnodar_chati",
     "realestate_dubai_rus",
     "Dubai_Go_Travel",
     "dubai1top",
     "depaldo_chat",
     "dubai_dlya_svoih",
-    "dubai_chat_biznes",
     "uazbekindubai",
     "dubaionline247",
     "sharjashat",
     "design467",
     "dubai_chat_russia",
 ]  # Сюда пересылаем только текстовые сообщения
+
+sent_messages = set()  # Храним ID уже пересланных сообщений
 
 
 async def send_latest_posts():
@@ -88,24 +65,27 @@ async def send_latest_posts():
                 if msg.grouped_id:
                     albums.setdefault(msg.grouped_id, []).append(msg)
                 else:
-                    # Если сообщение содержит медиа (не важно одно или альбом)
-                    if msg.media:
-                        individual_messages.append(msg)  # Это медиа-сообщение
-                    else:
-                        individual_messages.append(
-                            msg
-                        )  # Это текстовое сообщение без медиа
+                    individual_messages.append(msg)  # Это текстовое сообщение без медиа
+
+            tasks = []
 
             # Пересылаем альбомы
             for album in albums.values():
-                await forward_album(client, channels_with_photos, album)
+                task = asyncio.create_task(
+                    forward_album(client, channels_with_photos, album)
+                )
+                tasks.append(task)
+                print(
+                    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                )
 
             # Пересылаем обычные сообщения
             for msg in individual_messages:
-                if msg.media:  # Если медиа, то пересылаем как в channels_with_photos
-                    await forward_to_channels(client, channels_with_photos, msg)
-                else:  # Если это текстовое сообщение, то в channels_without_photos
-                    await forward_to_channels(client, channels_without_photos, msg)
+                task = asyncio.create_task(
+                    forward_to_channels(client, channels_without_photos, msg)
+                )
+                tasks.append(task)
+                print("tttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt")
 
             print("⚠ Ожидание 30 секунд перед новой проверкой...")
             await asyncio.sleep(30)  # Ждём перед следующей проверкой
@@ -125,11 +105,15 @@ async def forward_album(client, channels, album):
                 [msg.media for msg in media_group],  # Отправляем весь альбом
                 caption=text if text else None,  # Добавляем текст, если он есть
             )
+
             print(f"✅ Альбом переслан в {channel}")
         except ChatWriteForbiddenError:
             print(f"❌ Нет прав на отправку в {channel}")
         except Exception as e:
             print(f"❌ Ошибка пересылки в {channel}: {e}")
+        await asyncio.sleep(3)
+    print(" forward_albumtttttttttttttttttt")
+    await asyncio.sleep(30)
 
 
 async def forward_to_channels(client, channels, message):
@@ -138,10 +122,14 @@ async def forward_to_channels(client, channels, message):
         try:
             await client.forward_messages(channel, message)
             print(f"✅ Сообщение переслано в {channel}")
+
         except ChatWriteForbiddenError:
             print(f"❌ Нет прав на отправку в {channel}")
         except Exception as e:
             print(f"❌ Ошибка пересылки в {channel}: {e}")
+        await asyncio.sleep(3)
+    print(" forward_to_channelstttttttttttttttttt")
+    await asyncio.sleep(30)
 
 
 if __name__ == "__main__":
