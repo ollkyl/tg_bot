@@ -46,7 +46,9 @@ sent_messages = set()  # Храним ID уже пересланных сооб�
 
 
 async def send_latest_posts():
-    async with TelegramClient("session_name", api_id, api_hash) as client:
+    async with TelegramClient(
+        "session_name", api_id, api_hash, system_version="4.16.30-vxCUSTOM"
+    ) as client:
         while True:
             saved_messages = await client.get_messages(
                 "me", limit=20
@@ -67,25 +69,21 @@ async def send_latest_posts():
                 else:
                     individual_messages.append(msg)  # Это текстовое сообщение без медиа
 
-            tasks = []
+                # Пересылаем альбомы
 
-            # Пересылаем альбомы
-            for album in albums.values():
-                task = asyncio.create_task(
-                    forward_album(client, channels_with_photos, album)
-                )
-                tasks.append(task)
-                print(
-                    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-                )
+            async def album_task():
+                for album in albums.values():
+                    await forward_album(client, channels_with_photos, album)
+                    await asyncio.sleep(500)
 
-            # Пересылаем обычные сообщения
-            for msg in individual_messages:
-                task = asyncio.create_task(
-                    forward_to_channels(client, channels_without_photos, msg)
-                )
-                tasks.append(task)
-                print("tttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt")
+                # Пересылаем обычные сообщения
+
+            async def msg_task():
+                for msg in individual_messages:
+                    await forward_to_channels(client, channels_without_photos, msg)
+                    await asyncio.sleep(500)
+
+            await asyncio.gather(album_task(), msg_task())
 
             print("⚠ Ожидание 30 секунд перед новой проверкой...")
             await asyncio.sleep(30)  # Ждём перед следующей проверкой
@@ -105,7 +103,7 @@ async def forward_album(client, channels, album):
                 [msg.media for msg in media_group],  # Отправляем весь альбом
                 caption=text if text else None,  # Добавляем текст, если он есть
             )
-
+            await asyncio.sleep(2)
             print(f"✅ Альбом переслан в {channel}")
         except ChatWriteForbiddenError:
             print(f"❌ Нет прав на отправку в {channel}")
@@ -121,6 +119,7 @@ async def forward_to_channels(client, channels, message):
     for channel in channels:
         try:
             await client.forward_messages(channel, message)
+            await asyncio.sleep(2)
             print(f"✅ Сообщение переслано в {channel}")
 
         except ChatWriteForbiddenError:
