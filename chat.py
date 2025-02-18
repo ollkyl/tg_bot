@@ -64,11 +64,8 @@ def generate_response(user_id, user_message):
 
         # Добавляем новое сообщение пользователя в историю
         dialogues[user_id].append({"role": "user", "content": user_message})
-        dialogues[user_id] = dialogues[user_id][
-            -20:
-        ]  # Ограничиваем историю до 20 последних сообщений
 
-        data = {"messages": dialogues[user_id], "max_tokens": 200}
+        data = dialogues[user_id]
 
         while True:
             response = requests.post(url, headers=headers, json=data, timeout=20)
