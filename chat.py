@@ -1,10 +1,9 @@
 from telethon import TelegramClient, events
 import requests
-import os
+
 from dotenv import dotenv_values
 import json
 import time
-from fuzzywuzzy import fuzz
 
 
 env_values = dotenv_values(".env")
@@ -26,7 +25,8 @@ def load_prompt(filename="prompt.txt"):
 
 
 prompt = load_prompt()
-
+prpmpt = f"{prompt}"
+# Load the apartments from a JSON file
 try:
     with open(apartments_file, "r", encoding="utf-8") as f:
         apartments = json.load(f)
@@ -34,13 +34,21 @@ except Exception as e:
     print(f"Ошибка загрузки файла квартир: {e}")
     apartments = []
 
-apartments_str = "\n".join(
-    [
-        f" {apt['name']}\n {apt['address']}\n {apt['price']}\n  {apt['info']}\n "
-        for apt in apartments
-    ]
-)
 
+def format_apartments(apartments):
+    # """Форматирует список квартир из JSON в строку для бота."""
+    formatted_response = ""
+    for apt in apartments:
+        formatted_response += f"""🏠 *{apt["name"]}*
+📍 *Адрес:* {apt["address"]}
+💰 *Цена:* {apt["price"]}
+🟣 *Инфо:* {apt["info"] if apt["info"] else "Нет информации"}
+
+"""
+    return formatted_response.strip()  # Убираем лишние переносы строки
+
+
+apartments_str = format_apartments(apartments)
 
 # Создаем клиент Telegram
 client = TelegramClient("session_name", api_id, api_hash)
@@ -59,17 +67,13 @@ async def send_apartment_photo(user_id, apartment_id):
 
 def generate_response(user_id, user_message):
     try:
-        if user_id not in dialogues:
-            dialogues[user_id] = []
-
-        # Добавляем новое сообщение пользователя в историю
         dialogues[user_id].append({"role": "user", "content": user_message})
-
-        data = dialogues[user_id]
-
+        print("DEBUG:", dialogues[user_id])
+        print("DEBUG END")
         while True:
-            response = requests.post(url, headers=headers, json=data, timeout=20)
-
+            response = requests.post(
+                url, headers=headers, json=dialogues[user_id], timeout=20
+            )
             if response.status_code != 200:
                 print("Ошибка: сервер не ответил корректно.")
             else:
@@ -79,6 +83,8 @@ def generate_response(user_id, user_message):
                     json_str = json_str.replace("\n", "")
 
                     json_str = "[" + json_str.replace("} {", "}, {") + "]"
+                    print("Сырой ответ от API:", response.text)
+
                     response_data = json.loads(json_str)
                     if all(
                         item.get("content", "").strip() == "" for item in response_data
@@ -89,17 +95,16 @@ def generate_response(user_id, user_message):
                         bot_reply = ""
                         for item in response_data:
                             bot_reply += item["content"]
-                        print(bot_reply)
+                        print(f"бот сгенерил : {bot_reply}")
                         # Добавляем ответ бота в историю
                         dialogues[user_id].append(
                             {"role": "assistant", "content": bot_reply}
                         )
                         return bot_reply
                 except json.JSONDecodeError:
-                    print(response.text)
+                    print("Ошибка декодирования json")
 
     except requests.RequestException as e:
-        print(response.text)
         return f"Ошибка запроса к API: {str(e)}"
 
 
@@ -108,41 +113,47 @@ async def handle_new_message(event):
     user_message = event.message.message
     sender = await event.get_sender()
     user_id = sender.id  # Получаем ID отправителя
+    print(f"Новое сообщение от {sender.username}: {user_message}")
+    apartments_str = format_apartments(apartments)
+    prompt = load_prompt()
+    prompt += "Полный список квартир:\n" + apartments_str
 
     if not event.is_private:  # Игнорируем все, кроме личных сообщений
         return
 
-    print(f"Новое сообщение от {sender.username}: {user_message}")
-
-    # Если это первое сообщение в диалоге, даем специальный ответ
     if user_id not in dialogues:
+        dialogues[user_id] = []
+        dialogues[user_id].insert(0, {"role": "system", "content": prompt})
         response = generate_response(user_id, prompt)
+    # Добавляем новое сообщение пользователя в историю
 
-    else:
-        time.sleep(8)
-        response = generate_response(user_id, user_message)
-        entity = await client.get_entity(user_id)
+    # dialogues[user_id].append({"role": "user", "content": user_message})
+    # user_message = dialogues[user_id]
 
-        ##TO DO name change to id
-        if response.count("🟣") == 1:
-            for apartment in apartments:
-                response_cleaned = response.lower()
-                if fuzz.partial_ratio(apartment["name"].lower(), response_cleaned) > 80:
-                    await send_apartment_photo(user_id, apartment["id"])
-                    break
+    response = generate_response(user_id, user_message)
 
-        if "уточню у собственника" in response:
-            await client.send_message(
-                "me",
-                f"( клиент @{entity.username} ждет ответ собственника)",
-            )
-        if "вам удобно будет?" in response or "вам удобно будет?" in response:
-            await client.send_message(
-                "me", f"( клиент @{entity.username} хочет записаться на просмотр"
-            )
+    # entity = await client.get_entity(user_id)
+
+    # ##TO DO name change to id
+    # if response.count("🟣") == 1:
+    #     for apartment in apartments:
+    #         response_cleaned = response.lower()
+    #         if fuzz.partial_ratio(apartment["name"].lower(), response_cleaned) > 80:
+    #             await send_apartment_photo(user_id, apartment["id"])
+    #             break
+
+    # if "уточню у собственника" in response:
+    #     await client.send_message(
+    #         "me",
+    #         f"( клиент @{entity.username} ждет ответ собственника)",
+    #     )
+    # if "вам удобно будет?" in response or "вам удобно будет?" in response:
+    #     await client.send_message(
+    #         "me", f"( клиент @{entity.username} хочет записаться на просмотр"
+    #     )
 
     # Отправляем ответ
-    await event.reply(response)
+    await event.reply(response, parse_mode="HTML")
     print(f"Ответ отправлен: {response}")
 
 
