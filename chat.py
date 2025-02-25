@@ -2,8 +2,6 @@ from telethon import TelegramClient, events
 import cohere
 from dotenv import dotenv_values
 import json
-import time
-from fuzzywuzzy import fuzz
 from prompt import prompt_1
 
 env_values = dotenv_values(".env")
