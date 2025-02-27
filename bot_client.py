@@ -16,7 +16,6 @@ logging.basicConfig(level=logging.INFO)
 
 bot = Bot(token=API_TOKEN)
 dp = Dispatcher()
-bo
 
 
 # Определяем состояния для выбора цены
@@ -126,7 +125,7 @@ def get_district_keyboard(districts, selected_districts):
 @dp.message(Command("start"))
 async def send_welcome(message: types.Message, state: FSMContext):
     await message.answer(
-        "👋 Здравствуйте! Я ваш помощник по поиску квартир в аренду.\n      Укажите желаемые параметры и я буду следить за новыми предложениями. \n      Как только появятся квартиры, соответствующие вашим критериям, я сразу отправлю вам информацию! 🚀"
+        "👋 Здравствуйте! Я ваш помощник по поиску квартир в аренду.\n\n✅ Укажите желаемые параметры и я буду следить за новыми предложениями. \n\n🆕 Как только появятся квартиры, соответствующие вашим критериям, я сразу отправлю вам информацию! 🚀"
     )
     user_id = message.from_user.id
     user_name = message.from_user.username
@@ -211,7 +210,7 @@ async def choosing_period(callback: types.CallbackQuery, state: FSMContext):
     await state.set_state(Selection.choosing_period)
 
 
-@dp.callback_query(F.data.in_(["год", "месяц"]))
+@dp.callback_query(F.data.in_(["от года", "помесячно"]))
 async def confirm_period_choice(callback: types.CallbackQuery, state: FSMContext):
     period = callback.data
 
@@ -268,6 +267,8 @@ async def delete_data(callback: types.CallbackQuery, state: FSMContext):
     user_id = data.get("user_id")
     user_name = data.get("user_name")
     selected_message_id = data.get("selected_message_id")
+    finish_message_id = data.get("finish_message_id")
+    save_count = data.get("save_count", 0)
 
     selected_text = (
         "Выбранные параметры:\n"
@@ -288,11 +289,13 @@ async def delete_data(callback: types.CallbackQuery, state: FSMContext):
             parse_mode="HTML",
         )
         await state.clear()
-        # Обновляем состояние, оставляя только user_id и user_name, меняем статус
+        # Обновляем состояние, оставляя только user_id и user_name, td
         await state.update_data(
             user_id=user_id,
             user_name=user_name,
             selected_message_id=selected_message_id,
+            finish_message_id=finish_message_id,
+            save_count=save_count,
         )
     # await return_to_main_menu(callback, state)
 
@@ -313,6 +316,7 @@ async def save_data(callback: types.CallbackQuery, state: FSMContext):
     period = data.get("period", "Не выбранно")
     user_id = data.get("user_id")
     user_name = data.get("user_name")
+    save_count = data.get("save_count", 0)
     await add_client(
         user_id,
         min_price,
@@ -323,6 +327,51 @@ async def save_data(callback: types.CallbackQuery, state: FSMContext):
         user_name,
     )
     await callback.answer("Данные сохранены!")
+    finish_messages = [
+        "Параметры сохранены. Как только появится квартира подходящая по параметрам, вам придет сообщение с объявлением.",
+        "Параметры обновлены. Как только появится квартира подходящая по параметрам, вам придет сообщение с объявлением.",
+        "Параметры ОБНОВЛЕНЫ. Как только появится квартира подходящая по параметрам, вам придет сообщение с объявлением.",
+        "Параметры ОБНОВЛЕНЫ!!! Как только появится квартира подходящая по параметрам, вам придет сообщение с объявлением.",
+        "Параметры ЕЩЁ РАЗ ОБНОВЛЕНЫ. Как только появится квартира подходящая по параметрам, вам придет сообщение с объявлением.",
+        "Параметры ОбНоВлЕнЫ. Как только появится квартира подходящая по параметрам, вам придет сообщение с объявлением.",
+    ]
+
+    save_count += 1
+
+    if save_count == 1:
+        message_index = 0
+    else:
+        message_index = 1 + ((save_count - 2) % 5)
+
+    finish_message_id = data.get("finish_message_id")
+    finish_message = finish_messages[message_index]
+    try:
+        if finish_message_id:
+            # Если сообщение уже есть, обновляем его
+            await bot.edit_message_text(
+                text=finish_message,
+                chat_id=callback.message.chat.id,
+                message_id=finish_message_id,
+                parse_mode="HTML",
+            )
+        else:
+            # Если сообщения нет, отправляем новое и сохраняем его ID
+            sent_message = await callback.message.answer(
+                finish_message, parse_mode="HTML"
+            )
+            await state.update_data(finish_message_id=sent_message.message_id)
+        await state.update_data(save_count=save_count)
+    except AiogramError as e:
+        if "message is not modified" in str(e):
+            # Логируем, но не прерываем выполнение, если текст не изменился
+            logging.info(f"Сообщение не было изменено: {finish_message}")
+        else:
+            # Если другая ошибка Telegram, отправляем новое сообщение
+            logging.error(f"Ошибка Telegram при редактировании сообщения: {e}")
+            sent_message = await callback.message.answer(
+                finish_message, parse_mode="HTML"
+            )
+            await state.update_data(confirmation_message_id=sent_message.message_id)
 
 
 async def return_to_main_menu(callback: types.CallbackQuery, state: FSMContext):

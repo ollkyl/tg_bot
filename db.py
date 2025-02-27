@@ -27,7 +27,7 @@ class Client(Base):
     __tablename__ = "clients"
 
     id = Column(BigInteger, primary_key=True, index=True)
-    user_id = Column(Integer, nullable=True)
+    user_id = Column(BigInteger, nullable=True)
     min_price = Column(Integer, nullable=True)
     max_price = Column(Integer, nullable=True)
     rooms = Column(String(50), nullable=True)

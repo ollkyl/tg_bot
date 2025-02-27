@@ -7,6 +7,7 @@ photos/
 apartments.json
 prompt.py
 test.py
+
 # Кэшированные файлы Python
 __pycache__/
 *.pyc
