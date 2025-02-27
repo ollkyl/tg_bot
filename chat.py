@@ -3,30 +3,15 @@ import requests
 
 from dotenv import dotenv_values
 import json
-import time
-
+from prompt import prompt_1
 
 env_values = dotenv_values(".env")
 
 api_id = int(env_values.get("API_ID"))
 api_hash = env_values.get("API_HASH")
+cohere_api_key = env_values.get("COHERE_API_KEY")
 apartments_file = env_values.get("APARTMENTS_FILE", "apartments.json")
-url = "https://minitoolai.com/api/chatgpt/"
-bearer = env_values.get("BEARER")
-headers = {
-    "Authorization": bearer,
-    "Content-Type": "application/json",
-}
 
-
-def load_prompt(filename="prompt.txt"):
-    with open(filename, "r", encoding="utf-8") as f:
-        return f.read()
-
-
-prompt = load_prompt()
-prpmpt = f"{prompt}"
-# Load the apartments from a JSON file
 try:
     with open(apartments_file, "r", encoding="utf-8") as f:
         apartments = json.load(f)
@@ -34,21 +19,16 @@ except Exception as e:
     print(f"Ошибка загрузки файла квартир: {e}")
     apartments = []
 
-
-def format_apartments(apartments):
-    # """Форматирует список квартир из JSON в строку для бота."""
-    formatted_response = ""
-    for apt in apartments:
-        formatted_response += f"""🏠 *{apt["name"]}*
-📍 *Адрес:* {apt["address"]}
-💰 *Цена:* {apt["price"]}
-🟣 *Инфо:* {apt["info"] if apt["info"] else "Нет информации"}
-
-"""
-    return formatted_response.strip()  # Убираем лишние переносы строки
+apartments_str = "\n".join(
+    [
+        f" {apt['name']}\n {apt['address']}\n {apt['price']}\n  {apt['info']}\n "
+        for apt in apartments
+    ]
+)
 
 
-apartments_str = format_apartments(apartments)
+# Создаем клиент Cohere
+co = cohere.ClientV2(api_key=cohere_api_key)
 
 # Создаем клиент Telegram
 client = TelegramClient("session_name", api_id, api_hash)
@@ -120,41 +100,65 @@ async def handle_new_message(event):
 
     if not event.is_private:  # Игнорируем все, кроме личных сообщений
         return
+    global prompt_1
+    print(f"Новое сообщение от {sender.username}: {user_message}")
+    prompt_1 = (
+        prompt_1
+        + f"Список доступных квартир:{apartments_str}"
+        + f" клиент пишет :{user_message}"
+    )
 
+    # Если это первое сообщение в диалоге, даем специальный ответ
     if user_id not in dialogues:
-        dialogues[user_id] = []
-        dialogues[user_id].insert(0, {"role": "system", "content": prompt})
-        response = generate_response(user_id, prompt)
-    # Добавляем новое сообщение пользователя в историю
+        response = generate_response(user_id, prompt_1)
+        entity = await client.get_entity(user_id)
+        await client.send_message(entity, "Добрый день, какая квартира вас интересует?")
+    else:
+        response = generate_response(user_id, user_message)
+        entity = await client.get_entity(user_id)
 
-    # dialogues[user_id].append({"role": "user", "content": user_message})
-    # user_message = dialogues[user_id]
+        # if "11" in response:  #
+        #     await client.send_message(entity, "какая квартира вас интересует?")
 
-    response = generate_response(user_id, user_message)
+        if "33" in response:  # apartmrnts
+            for ap in apartments:
+                formatted_text = (
+                    f"⭐️ Сдается {ap['name']}!\n\n"
+                    f"📍 {ap['address']}\n"
+                    f"💵 Цена: {ap['price']}\n"
+                    f"ℹ️ {ap['info']}\n"
+                )
+                await client.send_message(entity, formatted_text)
 
-    # entity = await client.get_entity(user_id)
+        if "34" in response:  # apartmrnts
+            response = response[2:]  # убрать 2 первых символа
+            id = int(response.strip())
+            for ap in apartments:
+                if ap["id"] == id:
+                    formatted_text = (
+                        f"⭐️ Сдается {ap['name']}!\n\n"
+                        f"📍 {ap['address']}\n"
+                        f"💵 Цена: {ap['price']}\n"
+                        f"ℹ️ {ap['info']}\n"
+                    )
+            await send_apartment_photo(user_id, id)
+            await client.send_message(entity, f"{formatted_text}")
 
-    # ##TO DO name change to id
-    # if response.count("🟣") == 1:
-    #     for apartment in apartments:
-    #         response_cleaned = response.lower()
-    #         if fuzz.partial_ratio(apartment["name"].lower(), response_cleaned) > 80:
-    #             await send_apartment_photo(user_id, apartment["id"])
-    #             break
+        if "36" in response:
+            await client.send_message(
+                entity, "Мне нужно уточнить этот момент, скоро вернусь к вам с ответом)"
+            )
+            await client.send_message(
+                "me",
+                f"( клиент @{entity.username} ждет ответ собственника)",
+            )
+        if "35" in response:
+            await client.send_message(entity, "Отлично, когда вам удобно?")
+            await client.send_message(
+                "me", f"( клиент @{entity.username} хочет записаться на просмотр"
+            )
 
-    # if "уточню у собственника" in response:
-    #     await client.send_message(
-    #         "me",
-    #         f"( клиент @{entity.username} ждет ответ собственника)",
-    #     )
-    # if "вам удобно будет?" in response or "вам удобно будет?" in response:
-    #     await client.send_message(
-    #         "me", f"( клиент @{entity.username} хочет записаться на просмотр"
-    #     )
-
-    # Отправляем ответ
-    await event.reply(response, parse_mode="HTML")
-    print(f"Ответ отправлен: {response}")
+    print(f"код получен: {response}")
 
 
 async def main():

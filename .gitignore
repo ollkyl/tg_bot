@@ -5,8 +5,9 @@ env/
 .env
 photos/
 apartments.json
-prompt.txt
+prompt.py
 test.py
+
 # Кэшированные файлы Python
 __pycache__/
 *.pyc
