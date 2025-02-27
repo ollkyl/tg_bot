@@ -1,7 +1,8 @@
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.orm import declarative_base
 from dotenv import dotenv_values
-from sqlalchemy import Column, Integer, String, BigInteger
+from sqlalchemy import Column, Integer, String, BigInteger, update, delete
+
 
 env_values = dotenv_values(".env")
 
@@ -36,11 +37,18 @@ class Client(Base):
     user_name = Column(String(255), nullable=True)
 
 
-async def add_client(
-    user_id, min_price, max_price, rooms, district, period, user_name, status
-):
+async def add_client(user_id, min_price, max_price, rooms, district, period, user_name):
     async with async_session() as session:
-        async with async_session.begin():
+        async with session.begin():
+            stmt_update = (
+                update(Client).where(Client.user_id == user_id).values(status="N")
+            )
+            await session.execute(stmt_update)
+
+            await session.flush()
+
+            stmt_delete = delete(Client).where(Client.status == "N")
+            await session.execute(stmt_delete)
             new_client = Client(
                 user_id=user_id,
                 min_price=min_price,
@@ -49,7 +57,7 @@ async def add_client(
                 district=district,
                 period=period,
                 user_name=user_name,
-                status=status,
+                status="Y",
             )
             session.add(new_client)
         await session.commit()

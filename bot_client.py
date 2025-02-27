@@ -16,6 +16,7 @@ logging.basicConfig(level=logging.INFO)
 
 bot = Bot(token=API_TOKEN)
 dp = Dispatcher()
+bo
 
 
 # Определяем состояния для выбора цены
@@ -64,25 +65,27 @@ def get_max_price_keyboard(min_price):
     )
 
 
-# Кнопки выбора колличества комнат
-def get_count_of_rooms_keyboard():
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="студия", callback_data="студия")],
-            [InlineKeyboardButton(text="1-комнатная", callback_data="1-комнатная")],
-            [InlineKeyboardButton(text="2-комнатная", callback_data="2-комнатная")],
-            [InlineKeyboardButton(text="3-комнатная", callback_data="3-комнатная")],
-        ]
-        + [[InlineKeyboardButton(text="Назад", callback_data="back")]]
-    )
+rooms = ["студия", "1-комнатная", "2-комнатная", "3-комнатная", "4-комнатная"]
+
+
+# Кнопки выбора комнат
+def get_count_of_rooms_keyboard(rooms, selected_rooms):
+    buttons = []
+    for room in rooms:
+        text = f"✅ {room}" if room in selected_rooms else room
+        buttons.append([InlineKeyboardButton(text=text, callback_data=room)])
+
+    buttons.append([InlineKeyboardButton(text="Готово", callback_data="room_done")])
+    buttons.append([InlineKeyboardButton(text="Назад", callback_data="back")])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
 # Кнопки выбора срока
 def get_period_keyboard():
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="месяц", callback_data="месяц")],
-            [InlineKeyboardButton(text="год", callback_data="год")],
+            [InlineKeyboardButton(text="помесячно", callback_data="помесячно")],
+            [InlineKeyboardButton(text="от года", callback_data="от года")],
         ]
         + [[InlineKeyboardButton(text="Назад", callback_data="back")]]
     )
@@ -122,6 +125,9 @@ def get_district_keyboard(districts, selected_districts):
 # Обработчик команды /start
 @dp.message(Command("start"))
 async def send_welcome(message: types.Message, state: FSMContext):
+    await message.answer(
+        "👋 Здравствуйте! Я ваш помощник по поиску квартир в аренду.\n      Укажите желаемые параметры и я буду следить за новыми предложениями. \n      Как только появятся квартиры, соответствующие вашим критериям, я сразу отправлю вам информацию! 🚀"
+    )
     user_id = message.from_user.id
     user_name = message.from_user.username
     await state.update_data(user_id=user_id)
@@ -166,18 +172,31 @@ async def confirm_price(callback: types.CallbackQuery, state: FSMContext):
 @dp.callback_query(F.data == "button_rooms")
 async def choosing_count_of_rooms(callback: types.CallbackQuery, state: FSMContext):
     await callback.message.edit_text(
-        "Выберите количество комнат:", reply_markup=get_count_of_rooms_keyboard()
+        "Выберите количество комнат:",
+        reply_markup=get_count_of_rooms_keyboard(rooms, selected_rooms=[]),
     )
     await state.set_state(Selection.choosing_count_of_rooms)
 
 
-@dp.callback_query(F.data.in_(["студия", "1-комнатная", "2-комнатная", "3-комнатная"]))
+@dp.callback_query(F.data.in_(rooms))
 async def confirm_room_choice(callback: types.CallbackQuery, state: FSMContext):
-    count_of_rooms = callback.data
+    room = callback.data
+    data = await state.get_data()
+    selected_rooms = data.get("count_of_rooms", [])
+    if room in selected_rooms:
+        selected_rooms.remove(room)
+    else:
+        selected_rooms.append(room)
 
-    await state.update_data(count_of_rooms=count_of_rooms)
-    await callback.message.edit_text(f"Вы выбрали: {count_of_rooms}")
+    await state.update_data(count_of_rooms=selected_rooms)
+    await callback.message.edit_text(
+        "Выберите комнаты:",
+        reply_markup=get_count_of_rooms_keyboard(rooms, selected_rooms),
+    )
 
+
+@dp.callback_query(F.data == "room_done")
+async def confirm_rooms(callback: types.CallbackQuery, state: FSMContext):
     await return_to_main_menu(callback, state)
 
 
@@ -269,7 +288,7 @@ async def delete_data(callback: types.CallbackQuery, state: FSMContext):
             parse_mode="HTML",
         )
         await state.clear()
-        # Обновляем состояние, оставляя только user_id и user_name
+        # Обновляем состояние, оставляя только user_id и user_name, меняем статус
         await state.update_data(
             user_id=user_id,
             user_name=user_name,
@@ -286,9 +305,11 @@ async def save_data(callback: types.CallbackQuery, state: FSMContext):
     districts_selected = data.get("districts", [])
     district = ", ".join(districts_selected) if districts_selected else "Не выбрано"
 
+    selected_rooms = data.get("count_of_rooms", [])
+    count_of_rooms = ", ".join(selected_rooms) if selected_rooms else "Не выбрано"
+
     min_price = data.get("min_price", None)
     max_price = data.get("max_price", None)
-    count_of_rooms = data.get("count_of_rooms", "Не выбрано")
     period = data.get("period", "Не выбранно")
     user_id = data.get("user_id")
     user_name = data.get("user_name")
@@ -300,7 +321,6 @@ async def save_data(callback: types.CallbackQuery, state: FSMContext):
         district,
         period,
         user_name,
-        status="Y",
     )
     await callback.answer("Данные сохранены!")
 
@@ -312,9 +332,11 @@ async def return_to_main_menu(callback: types.CallbackQuery, state: FSMContext):
     districts_selected = data.get("districts", [])
     district = ", ".join(districts_selected) if districts_selected else "Не выбрано"
 
+    selected_rooms = data.get("count_of_rooms", [])
+    count_of_rooms = ", ".join(selected_rooms) if selected_rooms else "Не выбрано"
+
     min_price = data.get("min_price", "Не выбрано")
     max_price = data.get("max_price", "Не выбрано")
-    count_of_rooms = data.get("count_of_rooms", "Не выбрано")
     period = data.get("period", "Не выбранно")
     selected_text = (
         f"Выбранные параметры:\n"
