@@ -7,10 +7,13 @@ from aiogram.exceptions import AiogramError
 import asyncio
 import logging
 from dotenv import dotenv_values
-from db import add_client
+from db import add_client, add_apartment
 
 env_values = dotenv_values(".env")
 API_TOKEN = env_values.get("API_TOKEN")
+ADMIN_ID = int(
+    env_values.get("ADMIN_ID")
+)  # ID администратора, которому разрешено добавлять квартиры
 
 logging.basicConfig(level=logging.INFO)
 
@@ -45,22 +48,24 @@ inline_kb = InlineKeyboardMarkup(
 # Кнопки выбора минимальной цены
 def get_min_price_keyboard():
     return InlineKeyboardMarkup(
+        row_width=2,  # 2 кнопки в ряду
         inline_keyboard=[
             [InlineKeyboardButton(text=str(price), callback_data=f"min_{price}")]
-            for price in range(30000, 100000, 10000)
+            for price in range(60, 390, 20)
         ]
-        + [[InlineKeyboardButton(text="Назад", callback_data="back")]]
+        + [[InlineKeyboardButton(text="Назад", callback_data="back")]],
     )
 
 
 # Кнопки выбора максимальной цены (динамически формируются)
 def get_max_price_keyboard(min_price):
     return InlineKeyboardMarkup(
+        row_width=2,  # 2 кнопки в ряду
         inline_keyboard=[
             [InlineKeyboardButton(text=str(price), callback_data=f"max_{price}")]
-            for price in range(min_price + 10000, 110000, 10000)
+            for price in range(min_price + 10, 350, 10)
         ]
-        + [[InlineKeyboardButton(text="Назад", callback_data="back")]]
+        + [[InlineKeyboardButton(text="🔙 Назад", callback_data="back")]],
     )
 
 
@@ -91,21 +96,24 @@ def get_period_keyboard():
 
 
 districts = [
-    "district_1",
-    "district_2",
-    "district_3",
-    "district_4",
-    "district_5",
-    "district_6",
-    "district_7",
-    "district_8",
-    "district_9",
-    "district_10",
-    "district_11",
-    "district_12",
-    "district_13",
-    "district_14",
-    "district_15",
+    "Downtown Dubai & Business Bay",
+    "DIFC & Za'abeel",
+    "Dubai Marina & JBR",
+    "Palm Jumeirah & Bluewaters Island",
+    "Jumeirah (Jumeirah 1, 2, 3, Al Wasl, Al Safa)",
+    "Dubai Media City & Dubai Internet City",
+    "Dubai Hills Estate & Al Barsha",
+    "JVC & JVT",
+    "Arjan & Al Furjan",
+    "Discovery Gardens & The Gardens",
+    "Dubai Sports City & Motor City",
+    "Dubai Production City & Dubai Studio City",
+    "Meydan (Sobha Hartland, Azizi Riviera)",
+    "Dubai Creek Harbour & Dubai Design District",
+    "Dubai South & Emaar South",
+    "Damac Hills & Damac Hills 2",
+    "Al Jaddaf & Dubai Healthcare City (DHCC)",
+    "International City & Dubai Silicon Oasis",
 ]
 
 
@@ -121,12 +129,73 @@ def get_district_keyboard(districts, selected_districts):
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
+# Структура состояний
+class ApartmentForm(StatesGroup):
+    waiting_for_data = State()
+
+
+@dp.message(Command("add_apartment"))
+async def cmd_add_apartment(message: types.Message):
+    if message.from_user.id != ADMIN_ID:
+        await message.answer("У вас нет прав для выполнения этой команды.")
+        return
+    await message.answer(
+        "Введите данные квартиры в следующем формате:\n\n"
+        "Владелец, Название, Цена, Адрес, Доп. информация, Фото (пути через запятую)\n\n"
+        "Пример:\n"
+        "Иван Иванов, первая хатка,  100000, от года, 2-комнатная, JVC & JVT, Уютная квартира с ремонтом "
+    )
+
+    @dp.message()
+    async def process_apartment_data(msg: types.Message):
+        try:
+            # Разбиваем строку по запятым и убираем лишние пробелы
+            data = [item.strip() for item in msg.text.split(",")]
+            if len(data) < 6:
+                await msg.answer("Неверный формат. Убедитесь, что вы указали все поля.")
+                return
+
+            owner, title, price_str, period, info, district, rooms = data[:7]
+
+            price = int(price_str)
+
+            apartment_id, matching_clients = await add_apartment(
+                owner, title, price, rooms, district, period, info
+            )
+            await msg.answer(f"Квартира добавлена с ID {apartment_id}.")
+
+            # Отправляем уведомления подходящим клиентам
+            if matching_clients:
+                apartment_message = (
+                    f"🔔 Новое предложение!\n"
+                    f"🏠 {title}\n"
+                    f"💰 Цена: {price} AED\n"
+                    f"📍 Адрес: {district}\n"
+                    f"ℹ️ Инфо: {info}"
+                )
+                for user_id in matching_clients:
+                    try:
+                        await bot.send_message(user_id, apartment_message)
+                    except AiogramError as e:
+                        logging.error(
+                            f"Не удалось отправить сообщение пользователю {user_id}: {e}"
+                        )
+            else:
+                await msg.answer("Подходящих клиентов не найдено.")
+
+        except Exception as e:
+            await msg.answer(
+                "Произошла ошибка при добавлении квартиры. Попробуйте снова."
+            )
+            logging.error(f"Ошибка при добавлении квартиры: {e}")
+
+
 # Обработчик команды /start
 @dp.message(Command("start"))
 async def send_welcome(message: types.Message, state: FSMContext):
     await state.clear()
     await message.answer(
-        "👋 Здравствуйте! Я ваш помощник по поиску квартир в аренду.\n\n✅ Укажите желаемые параметры и я буду следить за новыми предложениями. \n\n🆕 Как только появятся квартиры, соответствующие вашим критериям, я сразу отправлю вам информацию! 🚀"
+        "👋 Здравствуйте! Я ваш помощник по поиску квартир в аренду.\n\n✅ Укажите желаемые параметры и я буду следить за новыми предложениями. \n\n🆕 Как только появятся квартиры, соответствующие вашим критериям, я отправлю вам информацию! 🚀"
     )
     user_id = message.from_user.id
     user_name = message.from_user.username
@@ -139,7 +208,8 @@ async def send_welcome(message: types.Message, state: FSMContext):
 @dp.callback_query(F.data == "button_price")
 async def choose_min_price(callback: types.CallbackQuery, state: FSMContext):
     await callback.message.edit_text(
-        "Выберите минимальную цену:", reply_markup=get_min_price_keyboard()
+        "Выберите минимальную цену \n(тысяч AED в год):",
+        reply_markup=get_min_price_keyboard(),
     )
     await state.set_state(Selection.choosing_min_price)
 
@@ -161,10 +231,7 @@ async def choose_max_price(callback: types.CallbackQuery, state: FSMContext):
 @dp.callback_query(F.data.startswith("max_"))
 async def confirm_price(callback: types.CallbackQuery, state: FSMContext):
     max_price = int(callback.data.split("_")[1])
-    data = await state.get_data()
-    min_price = data.get("min_price")
     await state.update_data(max_price=max_price)
-    await callback.message.edit_text(f"Вы выбрали диапазон: {min_price} - {max_price}")
     await return_to_main_menu(callback, state)
 
 
@@ -225,7 +292,7 @@ async def confirm_period_choice(callback: types.CallbackQuery, state: FSMContext
 @dp.callback_query(F.data == "button_district")
 async def choosing_district(callback: types.CallbackQuery, state: FSMContext):
     await callback.message.edit_text(
-        "Выберите район:",
+        "Выберите районы:",
         reply_markup=get_district_keyboard(districts, selected_districts=[]),
     )
     await state.set_state(Selection.choosing_district)
@@ -329,12 +396,12 @@ async def save_data(callback: types.CallbackQuery, state: FSMContext):
     )
     await callback.answer("Данные сохранены!")
     finish_messages = [
-        "Параметры сохранены. Как только появится квартира подходящая по параметрам, вам придет сообщение с объявлением.",
-        "Параметры обновлены. Как только появится квартира подходящая по параметрам, вам придет сообщение с объявлением.",
-        "Параметры ОБНОВЛЕНЫ. Как только появится квартира подходящая по параметрам, вам придет сообщение с объявлением.",
-        "Параметры ОБНОВЛЕНЫ!!! Как только появится квартира подходящая по параметрам, вам придет сообщение с объявлением.",
-        "Параметры ЕЩЁ РАЗ ОБНОВЛЕНЫ. Как только появится квартира подходящая по параметрам, вам придет сообщение с объявлением.",
-        "Параметры ОбНоВлЕнЫ. Как только появится квартира подходящая по параметрам, вам придет сообщение с объявлением.",
+        "Параметры сохранены! Мы уведомим вас, как только появится подходящее объявление.",
+        "Параметры обновлены. Мы сообщим вам, как только найдётся квартира по вашим критериям.",
+        "Ваши параметры обновлены! Оповестим вас, как только появятся новые подходящие варианты.",
+        "Настройки поиска обновлены. Вы получите уведомление, как только появится квартира по вашим параметрам.",
+        "Параметры успешно обновлены! Мы сообщим вам о новых подходящих объявлениях.",
+        "Ваши параметры обновлены. Теперь мы ищем квартиру по актуальным настройкам и уведомим вас при появлении подходящего варианта.",
     ]
 
     save_count += 1
@@ -388,14 +455,22 @@ async def return_to_main_menu(callback: types.CallbackQuery, state: FSMContext):
     min_price = data.get("min_price", "Не выбрано")
     max_price = data.get("max_price", "Не выбрано")
     period = data.get("period", "Не выбранно")
-    selected_text = (
-        f"Выбранные параметры:\n"
-        f"<code>🏠 Районы:</code> <b>{district}</b>\n"
-        f"<code>💰 Диапазон цены:</code> <b>{min_price}</b> - <b>{max_price}</b>\n"
-        f"<code>🛏 Комнаты:</code> <b>{count_of_rooms}</b>\n"
-        f"<code>📆 Срок аренды:</code> <b>{period}</b>"
-    )
-
+    if min_price != "Не выбрано":
+        selected_text = (
+            f"Выбранные параметры:\n"
+            f"<code>🏠 Районы:</code> <b>{district}</b>\n"
+            f"<code>💰 Диапазон цены:</code> <b>{min_price} k </b> - <b>{max_price} k AED </b>\n"
+            f"<code>🛏 Комнаты:</code> <b>{count_of_rooms}</b>\n"
+            f"<code>📆 Срок аренды:</code> <b>{period}</b>"
+        )
+    else:
+        selected_text = (
+            f"Выбранные параметры:\n"
+            f"<code>🏠 Районы:</code> <b>{district}</b>\n"
+            f"<code>💰 Диапазон цены:</code> <b>{min_price}</b>\n"
+            f"<code>🛏 Комнаты:</code> <b>{count_of_rooms}</b>\n"
+            f"<code>📆 Срок аренды:</code> <b>{period}</b>"
+        )
     message_id = data.get("selected_message_id")
     try:
         if message_id:
