@@ -1,8 +1,8 @@
 from telethon import TelegramClient, events
-import requests
-
+import cohere
 from dotenv import dotenv_values
 import json
+
 from prompt import prompt_1
 
 env_values = dotenv_values(".env")
@@ -47,45 +47,35 @@ async def send_apartment_photo(user_id, apartment_id):
 
 def generate_response(user_id, user_message):
     try:
+        # Добавляем сообщение пользователя в историю
+        if user_id not in dialogues:
+            dialogues[user_id] = []
+
         dialogues[user_id].append({"role": "user", "content": user_message})
-        print("DEBUG:", dialogues[user_id])
-        print("DEBUG END")
-        while True:
-            response = requests.post(
-                url, headers=headers, json=dialogues[user_id], timeout=20
-            )
-            if response.status_code != 200:
-                print("Ошибка: сервер не ответил корректно.")
-            else:
-                try:
-                    json_str = response.text
-                    json_str = json_str.replace("data:", "")
-                    json_str = json_str.replace("\n", "")
 
-                    json_str = "[" + json_str.replace("} {", "}, {") + "]"
-                    print("Сырой ответ от API:", response.text)
+        # Ограничиваем историю 20 последними сообщениями (чтобы не перегружать API)
+        dialogues[user_id] = dialogues[user_id][-20:]
 
-                    response_data = json.loads(json_str)
-                    if all(
-                        item.get("content", "").strip() == "" for item in response_data
-                    ):
-                        print(f"Текст ответа: {response.text}")
-                        print("Пустой API")
-                    else:
-                        bot_reply = ""
-                        for item in response_data:
-                            bot_reply += item["content"]
-                        print(f"бот сгенерил : {bot_reply}")
-                        # Добавляем ответ бота в историю
-                        dialogues[user_id].append(
-                            {"role": "assistant", "content": bot_reply}
-                        )
-                        return bot_reply
-                except json.JSONDecodeError:
-                    print("Ошибка декодирования json")
+        # Запрос к Cohere с историей
+        response = co.chat(
+            model="command-r7b-12-2024",
+            messages=dialogues[user_id],  # Передаем всю историю
+            max_tokens=200,  # Даем больше места для ответа
+        )
 
-    except requests.RequestException as e:
-        return f"Ошибка запроса к API: {str(e)}"
+        print("Полный ответ Cohere:", response)  # 👀 Выводим ответ API
+
+        # Извлекаем текст
+        if response.message and response.message.content:
+            bot_reply = response.message.content[0].text.strip()
+            # Добавляем ответ бота в историю
+            dialogues[user_id].append({"role": "assistant", "content": bot_reply})
+
+            return bot_reply
+        else:
+            return "Ошибка: API не вернул текст."
+    except Exception as e:
+        return f"Ошибка при обработке ответа: {str(e)}"
 
 
 @client.on(events.NewMessage(incoming=True))
@@ -93,10 +83,6 @@ async def handle_new_message(event):
     user_message = event.message.message
     sender = await event.get_sender()
     user_id = sender.id  # Получаем ID отправителя
-    print(f"Новое сообщение от {sender.username}: {user_message}")
-    apartments_str = format_apartments(apartments)
-    prompt = load_prompt()
-    prompt += "Полный список квартир:\n" + apartments_str
 
     if not event.is_private:  # Игнорируем все, кроме личных сообщений
         return
