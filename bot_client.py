@@ -51,7 +51,7 @@ def get_min_price_keyboard():
         row_width=2,  # 2 кнопки в ряду
         inline_keyboard=[
             [InlineKeyboardButton(text=str(price), callback_data=f"min_{price}")]
-            for price in range(60, 390, 20)
+            for price in range(4000, 40000, 2000)
         ]
         + [[InlineKeyboardButton(text="Назад", callback_data="back")]],
     )
@@ -63,7 +63,7 @@ def get_max_price_keyboard(min_price):
         row_width=2,  # 2 кнопки в ряду
         inline_keyboard=[
             [InlineKeyboardButton(text=str(price), callback_data=f"max_{price}")]
-            for price in range(min_price + 10, 350, 10)
+            for price in range(min_price + 1000, 40000, 1000)
         ]
         + [[InlineKeyboardButton(text="🔙 Назад", callback_data="back")]],
     )
@@ -208,7 +208,7 @@ async def send_welcome(message: types.Message, state: FSMContext):
 @dp.callback_query(F.data == "button_price")
 async def choose_min_price(callback: types.CallbackQuery, state: FSMContext):
     await callback.message.edit_text(
-        "Выберите минимальную цену \n(тысяч AED в год):",
+        "Выберите минимальную цену \n(тысяч AED в месяц):",
         reply_markup=get_min_price_keyboard(),
     )
     await state.set_state(Selection.choosing_min_price)
