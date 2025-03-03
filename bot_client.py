@@ -47,7 +47,6 @@ inline_kb = InlineKeyboardMarkup(
 # Кнопки выбора минимальной цены
 def get_min_price_keyboard():
     return InlineKeyboardMarkup(
-        row_width=2,  # 2 кнопки в ряду
         inline_keyboard=[
             [InlineKeyboardButton(text=str(price), callback_data=f"min_{price}")]
             for price in range(4000, 40000, 2000)
@@ -59,7 +58,6 @@ def get_min_price_keyboard():
 # Кнопки выбора максимальной цены (динамически формируются)
 def get_max_price_keyboard(min_price):
     return InlineKeyboardMarkup(
-        row_width=2,  # 2 кнопки в ряду
         inline_keyboard=[
             [InlineKeyboardButton(text=str(price), callback_data=f"max_{price}")]
             for price in range(min_price + 1000, 40000, 1000)
@@ -87,8 +85,12 @@ def get_count_of_rooms_keyboard(rooms, selected_rooms):
 def get_period_keyboard():
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="помесячно", callback_data="помесячно")],
-            [InlineKeyboardButton(text="от года", callback_data="от года")],
+            [InlineKeyboardButton(text="только помесячно", callback_data="помесячно")],
+            [
+                InlineKeyboardButton(
+                    text="от года или помесячно", callback_data="от года"
+                )
+            ],
         ]
         + [[InlineKeyboardButton(text="Назад", callback_data="back")]]
     )
@@ -141,11 +143,10 @@ async def cmd_add_apartment(message: types.Message, state: FSMContext):
         await message.answer("У вас нет прав для выполнения этой команды.")
         return
     await message.answer(
-        "Введите данные квартиры в следующем формате:\n\n"
-        "Владелец, Название, Цена, Адрес, Доп. информация, Район, [Комнатность]\n\n"
+        "Введите данные квартиры в следующем формате СТРОГО ЧЕРЕЗ @:\n\n"
+        "Владелец @ Название @ Цена @ период @ доп. информация @ Район @ комнатность \n\n"
         "Пример:\n"
-        "Иван Иванов, первая хатка, 100000, от года, 2-комнатная, JVC & JVT, Уютная квартира с ремонтом\n\n"
-        "После этого отправляйте фото. Каждое сообщение может содержать фото (с максимальным разрешением). "
+        "Владелец Такой-то @ Сдается 2-bedroom в Business Bay!@ 180000@ от года@ депозит - 16.500 AED@ The Pad by Omniyat @ 2-комнатная \n\n"
         "Для завершения отправьте команду /add_and_send."
     )
     # Инициализируем состояние с пустым списком для file_ids
@@ -162,16 +163,14 @@ async def process_apartment_data(msg: types.Message, state: FSMContext):
 
     # Если сообщение содержит подпись — обрабатываем данные квартиры
     if msg.caption:
-        data = [item.strip() for item in msg.caption.split(",")]
+        data = [item.strip() for item in msg.caption.split("%")]
         if len(data) < 6:
             await msg.answer("Неверный формат. Убедитесь, что вы указали все поля.")
             return
         # Если данные квартиры ещё не сохранены — сохраняем их
         if not current_data.get("apartment_data"):
             await state.update_data(apartment_data=data)
-            await msg.answer(
-                "Данные квартиры сохранены. Теперь отправьте фото (одно или несколько сообщений)."
-            )
+            await msg.answer("Данные квартиры сохранены.")
         else:
             await msg.answer(
                 "Данные квартиры уже введены. Продолжайте отправлять фото или завершите ввод командой /add_and_send."
@@ -190,7 +189,6 @@ async def process_apartment_data(msg: types.Message, state: FSMContext):
 
 @dp.message(Command("add_and_send"), StateFilter(ApartmentForm.waiting_for_data))
 async def cmd_add_and_send(message: types.Message, state: FSMContext):
-    print("aaaaaaaaaaaaaddddddddddd")
     current_data = await state.get_data()
     apartment_data = current_data.get("apartment_data")
     file_ids = current_data.get("file_ids", [])
@@ -208,7 +206,7 @@ async def cmd_add_and_send(message: types.Message, state: FSMContext):
         await message.answer("Ошибка при обработке данных квартиры.")
         logging.error(f"Ошибка при обработке данных: {e}")
         return
-    print(f"GGGGGGGGGG{owner, title, price, rooms, district, period, info, file_ids}")
+
     # Добавляем квартиру в базу данных
     apartment_id, matching_clients = await add_apartment(
         owner, title, price, rooms, district, period, info, file_ids
@@ -218,11 +216,16 @@ async def cmd_add_and_send(message: types.Message, state: FSMContext):
     # Отправляем уведомления подходящим клиентам
     if matching_clients:
         apartment_message = (
-            f"🔔 Новое предложение!\n"
             f"🏠 {title}\n"
             f"💰 Цена: {price} AED\n"
+            f"🛏️ Комнаты: {rooms}\n"
             f"📍 Адрес: {district}\n"
-            f"ℹ️ Инфо: {info}"
+            f"⌛ Период: {period}\n"
+            f"ℹ️ Инфо: {info}\n"
+            f"Контакт: @Olkyl"
+        )
+        await message.answer(
+            f"Найдено совпадений по параметрам {len(matching_clients)}."
         )
 
         for user_id in matching_clients:
@@ -263,7 +266,7 @@ async def send_welcome(message: types.Message, state: FSMContext):
 @dp.callback_query(F.data == "button_price")
 async def choose_min_price(callback: types.CallbackQuery, state: FSMContext):
     await callback.message.edit_text(
-        "Выберите минимальную цену \n(тысяч AED в месяц):",
+        "Выберите минимальную плату \n(AED в месяц):",
         reply_markup=get_min_price_keyboard(),
     )
     await state.set_state(Selection.choosing_min_price)
@@ -276,7 +279,7 @@ async def choose_max_price(callback: types.CallbackQuery, state: FSMContext):
     await state.update_data(min_price=min_price)
 
     await callback.message.edit_text(
-        f"Минимальная цена: {min_price}\nТеперь выберите максимальную цену:",
+        f"Минимальная плата: {min_price}\nТеперь выберите максимальную плату:",
         reply_markup=get_max_price_keyboard(min_price),
     )
     await state.set_state(Selection.choosing_max_price)
@@ -514,7 +517,7 @@ async def return_to_main_menu(callback: types.CallbackQuery, state: FSMContext):
         selected_text = (
             f"Выбранные параметры:\n"
             f"<code>🏠 Районы:</code> <b>{district}</b>\n"
-            f"<code>💰 Диапазон цены:</code> <b>{min_price} k </b> - <b>{max_price} k AED </b>\n"
+            f"<code>💰 Диапазон цены:</code> <b>{min_price} </b> - <b>{max_price} AED в месяц</b>\n"
             f"<code>🛏 Комнаты:</code> <b>{count_of_rooms}</b>\n"
             f"<code>📆 Срок аренды:</code> <b>{period}</b>"
         )

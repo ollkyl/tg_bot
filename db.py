@@ -124,14 +124,12 @@ async def find_matching_clients(apartment):
                 (Client.min_price <= apartment.price)
                 & (Client.max_price >= apartment.price)
             )
-        # if apartment.rooms:
-        #     query = query.where(
-        #         Client.rooms.contains(apartment.rooms.split()[0])
-        #     )  # Например, "Студия" или "1-комнатная"
-        # if apartment.district:
-        #     query = query.where(Client.district.contains(apartment.district))
-        # if apartment.period:
-        #     query = query.where(Client.period == apartment.period)
+        if apartment.rooms:
+            query = query.where(Client.rooms.contains(apartment.rooms))
+        if apartment.district:
+            query = query.where(Client.district.contains(apartment.district))
+        if apartment.period:
+            query = query.where(Client.period == apartment.period)
 
         result = await session.execute(query)
         clients = result.scalars().all()
