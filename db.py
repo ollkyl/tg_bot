@@ -6,6 +6,7 @@ from sqlalchemy import (
     String,
     BigInteger,
     DateTime,
+    ARRAY,
     func,
     update,
     delete,
@@ -58,6 +59,7 @@ class Apartment(Base):
     period = Column(String, nullable=True)
     info = Column(String, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
+    photo_id = Column(ARRAY(String))
 
 
 async def add_client(user_id, min_price, max_price, rooms, district, period, user_name):
@@ -86,7 +88,7 @@ async def add_client(user_id, min_price, max_price, rooms, district, period, use
         await session.commit()
 
 
-async def add_apartment(owner, name, price, rooms, district, period, info):
+async def add_apartment(owner, name, price, rooms, district, period, info, photo_id):
     """Добавление квартиры и уведомление подходящих клиентов."""
     async with async_session() as session:
         async with session.begin():
@@ -98,6 +100,7 @@ async def add_apartment(owner, name, price, rooms, district, period, info):
                 rooms=rooms,
                 district=district,
                 info=info,
+                photo_id=photo_id,
             )
             session.add(new_apartment)
             await session.flush()  # Сохраняем объект, чтобы получить ID

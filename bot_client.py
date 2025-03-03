@@ -2,7 +2,7 @@ from aiogram import Bot, Dispatcher, types, F
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
-from aiogram.filters import Command
+from aiogram.filters import Command, StateFilter
 from aiogram.exceptions import AiogramError
 import asyncio
 import logging
@@ -21,7 +21,6 @@ bot = Bot(token=API_TOKEN)
 dp = Dispatcher()
 
 
-# Определяем состояния для выбора цены
 class Selection(StatesGroup):
     choosing_min_price = State()
     choosing_max_price = State()
@@ -96,24 +95,25 @@ def get_period_keyboard():
 
 
 districts = [
-    "Downtown Dubai & Business Bay",
-    "DIFC & Za'abeel",
-    "Dubai Marina & JBR",
-    "Palm Jumeirah & Bluewaters Island",
-    "Jumeirah (Jumeirah 1, 2, 3, Al Wasl, Al Safa)",
-    "Dubai Media City & Dubai Internet City",
-    "Dubai Hills Estate & Al Barsha",
-    "JVC & JVT",
-    "Arjan & Al Furjan",
-    "Discovery Gardens & The Gardens",
-    "Dubai Sports City & Motor City",
-    "Dubai Production City & Dubai Studio City",
-    "Meydan (Sobha Hartland, Azizi Riviera)",
-    "Dubai Creek Harbour & Dubai Design District",
-    "Dubai South & Emaar South",
-    "Damac Hills & Damac Hills 2",
-    "Al Jaddaf & Dubai Healthcare City (DHCC)",
-    "International City & Dubai Silicon Oasis",
+    "Citywalk",
+    "Bluewaters",
+    "The Palm Jumeirah",
+    "Dubai Marina",
+    "Business Bay",
+    "Downtown",
+    "DIFC",
+    "ZAABEL + DHCC",
+    "Dubai Media City + Dubai Internet City",
+    "JLT",
+    "JVC",
+    "Meydan: Sobha + Azizi Riviera",
+    "Dubai Design District + Al Jaddaf",
+    "JVT",
+    "Creek Harbour",
+    "Dubai Production City + Sport City + Motor City",
+    "Al Furjan + Discovery Garden",
+    "Al Quoz",
+    "Al Barsha + Arjan",
 ]
 
 
@@ -132,62 +132,117 @@ def get_district_keyboard(districts, selected_districts):
 # Структура состояний
 class ApartmentForm(StatesGroup):
     waiting_for_data = State()
+    apartment_data = State()
 
 
 @dp.message(Command("add_apartment"))
-async def cmd_add_apartment(message: types.Message):
+async def cmd_add_apartment(message: types.Message, state: FSMContext):
     if message.from_user.id != ADMIN_ID:
         await message.answer("У вас нет прав для выполнения этой команды.")
         return
     await message.answer(
         "Введите данные квартиры в следующем формате:\n\n"
-        "Владелец, Название, Цена, Адрес, Доп. информация, Фото (пути через запятую)\n\n"
+        "Владелец, Название, Цена, Адрес, Доп. информация, Район, [Комнатность]\n\n"
         "Пример:\n"
-        "Иван Иванов, первая хатка,  100000, от года, 2-комнатная, JVC & JVT, Уютная квартира с ремонтом "
+        "Иван Иванов, первая хатка, 100000, от года, 2-комнатная, JVC & JVT, Уютная квартира с ремонтом\n\n"
+        "После этого отправляйте фото. Каждое сообщение может содержать фото (с максимальным разрешением). "
+        "Для завершения отправьте команду /add_and_send."
     )
+    # Инициализируем состояние с пустым списком для file_ids
+    await state.update_data(file_ids=[], apartment_data=None)
+    await state.set_state(ApartmentForm.waiting_for_data)
 
-    @dp.message()
-    async def process_apartment_data(msg: types.Message):
-        try:
-            # Разбиваем строку по запятым и убираем лишние пробелы
-            data = [item.strip() for item in msg.text.split(",")]
-            if len(data) < 6:
-                await msg.answer("Неверный формат. Убедитесь, что вы указали все поля.")
-                return
 
-            owner, title, price_str, period, info, district, rooms = data[:7]
+@dp.message(
+    StateFilter(ApartmentForm.waiting_for_data), ~Command(commands=["add_and_send"])
+)
+async def process_apartment_data(msg: types.Message, state: FSMContext):
+    current_data = await state.get_data()
+    file_ids = current_data.get("file_ids", [])
 
-            price = int(price_str)
-
-            apartment_id, matching_clients = await add_apartment(
-                owner, title, price, rooms, district, period, info
-            )
-            await msg.answer(f"Квартира добавлена с ID {apartment_id}.")
-
-            # Отправляем уведомления подходящим клиентам
-            if matching_clients:
-                apartment_message = (
-                    f"🔔 Новое предложение!\n"
-                    f"🏠 {title}\n"
-                    f"💰 Цена: {price} AED\n"
-                    f"📍 Адрес: {district}\n"
-                    f"ℹ️ Инфо: {info}"
-                )
-                for user_id in matching_clients:
-                    try:
-                        await bot.send_message(user_id, apartment_message)
-                    except AiogramError as e:
-                        logging.error(
-                            f"Не удалось отправить сообщение пользователю {user_id}: {e}"
-                        )
-            else:
-                await msg.answer("Подходящих клиентов не найдено.")
-
-        except Exception as e:
+    # Если сообщение содержит подпись — обрабатываем данные квартиры
+    if msg.caption:
+        data = [item.strip() for item in msg.caption.split(",")]
+        if len(data) < 6:
+            await msg.answer("Неверный формат. Убедитесь, что вы указали все поля.")
+            return
+        # Если данные квартиры ещё не сохранены — сохраняем их
+        if not current_data.get("apartment_data"):
+            await state.update_data(apartment_data=data)
             await msg.answer(
-                "Произошла ошибка при добавлении квартиры. Попробуйте снова."
+                "Данные квартиры сохранены. Теперь отправьте фото (одно или несколько сообщений)."
             )
-            logging.error(f"Ошибка при добавлении квартиры: {e}")
+        else:
+            await msg.answer(
+                "Данные квартиры уже введены. Продолжайте отправлять фото или завершите ввод командой /add_and_send."
+            )
+
+    # Если сообщение содержит фото — добавляем максимальное фото в список
+    if msg.photo:
+        # Берём последний элемент списка, т.к. он содержит фото с наибольшим разрешением
+        file_id = msg.photo[-1].file_id
+        file_ids.append(file_id)
+        await state.update_data(file_ids=file_ids)
+        await msg.answer(
+            "Фото добавлено. Отправьте следующее, если нужно, или завершите командой /add_and_send."
+        )
+
+
+@dp.message(Command("add_and_send"), StateFilter(ApartmentForm.waiting_for_data))
+async def cmd_add_and_send(message: types.Message, state: FSMContext):
+    print("aaaaaaaaaaaaaddddddddddd")
+    current_data = await state.get_data()
+    apartment_data = current_data.get("apartment_data")
+    file_ids = current_data.get("file_ids", [])
+
+    if not apartment_data:
+        await message.answer("Сначала введите данные квартиры с подписью.")
+        return
+
+    # Разбираем данные (предполагаем, что порядок фиксирован)
+    try:
+        owner, title, price_str, period, info, district = apartment_data[:6]
+        rooms = apartment_data[6] if len(apartment_data) > 6 else "Не указано"
+        price = int(price_str)
+    except Exception as e:
+        await message.answer("Ошибка при обработке данных квартиры.")
+        logging.error(f"Ошибка при обработке данных: {e}")
+        return
+    print(f"GGGGGGGGGG{owner, title, price, rooms, district, period, info, file_ids}")
+    # Добавляем квартиру в базу данных
+    apartment_id, matching_clients = await add_apartment(
+        owner, title, price, rooms, district, period, info, file_ids
+    )
+    await message.answer(f"Квартира добавлена с ID {apartment_id}.")
+
+    # Отправляем уведомления подходящим клиентам
+    if matching_clients:
+        apartment_message = (
+            f"🔔 Новое предложение!\n"
+            f"🏠 {title}\n"
+            f"💰 Цена: {price} AED\n"
+            f"📍 Адрес: {district}\n"
+            f"ℹ️ Инфо: {info}"
+        )
+
+        for user_id in matching_clients:
+            try:
+                if file_ids:
+                    media = [
+                        types.InputMediaPhoto(media=file_id) for file_id in file_ids
+                    ]
+                    media[0].caption = apartment_message
+                    await bot.send_media_group(chat_id=user_id, media=media)
+                else:
+                    await bot.send_photo(user_id, apartment_message)
+            except AiogramError as e:
+                logging.error(
+                    f"Не удалось отправить сообщение пользователю {user_id}: {e}"
+                )
+    else:
+        await message.answer("Подходящих клиентов не найдено.")
+
+    await state.clear()
 
 
 # Обработчик команды /start
