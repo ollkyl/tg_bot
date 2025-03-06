@@ -1,5 +1,10 @@
 from aiogram import Bot, Dispatcher, types, F
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import (
+    InlineKeyboardMarkup,
+    InlineKeyboardButton,
+    ReplyKeyboardMarkup,
+    KeyboardButton,
+)
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.filters import Command, StateFilter
@@ -21,6 +26,41 @@ bot = Bot(token=API_TOKEN)
 dp = Dispatcher()
 
 
+districts = [
+    "Citywalk",
+    "Bluewaters",
+    "The Palm Jumeirah",
+    "Dubai Marina",
+    "Business Bay",
+    "Downtown",
+    "DIFC",
+    "ZAABEL + DHCC",
+    "Dubai Media City + Dubai Internet City",
+    "JLT",
+    "JVC",
+    "Meydan: Sobha + Azizi Riviera",
+    "Dubai Design District + Al Jaddaf",
+    "JVT",
+    "Creek Harbour",
+    "Dubai Production City + Sport City + Motor City",
+    "Al Furjan + Discovery Garden",
+    "Al Quoz",
+    "Al Barsha + Arjan",
+]
+
+rooms = ["студия", "1-комнатная", "2-комнатная", "3-комнатная", "4-комнатная"]
+
+
+finish_messages = [
+    "Параметры сохранены! Мы уведомим вас, как только появится подходящее объявление.",
+    "Параметры обновлены. Мы сообщим вам, как только найдётся квартира по вашим критериям.",
+    "Ваши параметры обновлены! Оповестим вас, как только появятся новые подходящие варианты.",
+    "Настройки поиска обновлены. Вы получите уведомление, как только появится квартира по вашим параметрам.",
+    "Параметры успешно обновлены! Мы сообщим вам о новых подходящих объявлениях.",
+    "Ваши параметры обновлены. Теперь мы ищем квартиру по актуальным настройкам и уведомим вас при появлении подходящего варианта.",
+]
+
+
 class Selection(StatesGroup):
     choosing_min_price = State()
     choosing_max_price = State()
@@ -29,6 +69,12 @@ class Selection(StatesGroup):
     choosing_period = State()
     selected_message_id = State()
     user_id = State()
+
+
+# Структура состояний
+class ApartmentForm(StatesGroup):
+    waiting_for_data = State()
+    apartment_data = State()
 
 
 # Кнопки главного меню
@@ -41,6 +87,14 @@ inline_kb = InlineKeyboardMarkup(
         [InlineKeyboardButton(text="Сохранить выбор", callback_data="button_save")],
         [InlineKeyboardButton(text="Отчистить всё", callback_data="button_delete")],
     ]
+)
+
+# Главное меню с кнопкой "Перезапустить бота"
+main_menu = ReplyKeyboardMarkup(
+    keyboard=[
+        [KeyboardButton(text="Перезапустить бота")],
+    ],
+    resize_keyboard=True,
 )
 
 
@@ -64,9 +118,6 @@ def get_max_price_keyboard(min_price):
         ]
         + [[InlineKeyboardButton(text="🔙 Назад", callback_data="back")]],
     )
-
-
-rooms = ["студия", "1-комнатная", "2-комнатная", "3-комнатная", "4-комнатная"]
 
 
 # Кнопки выбора комнат
@@ -96,29 +147,6 @@ def get_period_keyboard():
     )
 
 
-districts = [
-    "Citywalk",
-    "Bluewaters",
-    "The Palm Jumeirah",
-    "Dubai Marina",
-    "Business Bay",
-    "Downtown",
-    "DIFC",
-    "ZAABEL + DHCC",
-    "Dubai Media City + Dubai Internet City",
-    "JLT",
-    "JVC",
-    "Meydan: Sobha + Azizi Riviera",
-    "Dubai Design District + Al Jaddaf",
-    "JVT",
-    "Creek Harbour",
-    "Dubai Production City + Sport City + Motor City",
-    "Al Furjan + Discovery Garden",
-    "Al Quoz",
-    "Al Barsha + Arjan",
-]
-
-
 # Кнопки выбора района
 def get_district_keyboard(districts, selected_districts):
     buttons = []
@@ -131,12 +159,6 @@ def get_district_keyboard(districts, selected_districts):
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
-# Структура состояний
-class ApartmentForm(StatesGroup):
-    waiting_for_data = State()
-    apartment_data = State()
-
-
 @dp.message(Command("add_apartment"))
 async def cmd_add_apartment(message: types.Message, state: FSMContext):
     if message.from_user.id != ADMIN_ID:
@@ -144,12 +166,11 @@ async def cmd_add_apartment(message: types.Message, state: FSMContext):
         return
     await message.answer(
         "Введите данные квартиры в следующем формате СТРОГО ЧЕРЕЗ @:\n\n"
-        "Владелец @ Название @ Цена @ период @ доп. информация @ Район @ комнатность \n\n"
+        "Агент @ Название @ Цена @ период @ доп. информация @ Район @ комнатность \n\n"
         "Пример:\n"
-        "Владелец Такой-то @ Сдается 2-bedroom в Business Bay!@ 180000@ от года@ депозит - 16.500 AED@ The Pad by Omniyat @ 2-комнатная \n\n"
+        " DBX_real_estate @ Сдается 2-bedroom в Business Bay!@ 180000@ от года@ депозит - 16.500 AED@ The Pad by Omniyat @ 2-комнатная \n\n"
         "Для завершения отправьте команду /add_and_send."
     )
-    # Инициализируем состояние с пустым списком для file_ids
     await state.update_data(file_ids=[], apartment_data=None)
     await state.set_state(ApartmentForm.waiting_for_data)
 
@@ -161,13 +182,12 @@ async def process_apartment_data(msg: types.Message, state: FSMContext):
     current_data = await state.get_data()
     file_ids = current_data.get("file_ids", [])
 
-    # Если сообщение содержит подпись — обрабатываем данные квартиры
     if msg.caption:
-        data = [item.strip() for item in msg.caption.split("%")]
+        data = [item.strip() for item in msg.caption.split("@")]
         if len(data) < 6:
             await msg.answer("Неверный формат. Убедитесь, что вы указали все поля.")
             return
-        # Если данные квартиры ещё не сохранены — сохраняем их
+
         if not current_data.get("apartment_data"):
             await state.update_data(apartment_data=data)
             await msg.answer("Данные квартиры сохранены.")
@@ -176,9 +196,7 @@ async def process_apartment_data(msg: types.Message, state: FSMContext):
                 "Данные квартиры уже введены. Продолжайте отправлять фото или завершите ввод командой /add_and_send."
             )
 
-    # Если сообщение содержит фото — добавляем максимальное фото в список
     if msg.photo:
-        # Берём последний элемент списка, т.к. он содержит фото с наибольшим разрешением
         file_id = msg.photo[-1].file_id
         file_ids.append(file_id)
         await state.update_data(file_ids=file_ids)
@@ -197,9 +215,9 @@ async def cmd_add_and_send(message: types.Message, state: FSMContext):
         await message.answer("Сначала введите данные квартиры с подписью.")
         return
 
-    # Разбираем данные (предполагаем, что порядок фиксирован)
+    # Разбираем данные
     try:
-        owner, title, price_str, period, info, district = apartment_data[:6]
+        agent, title, price_str, period, info, district = apartment_data[:6]
         rooms = apartment_data[6] if len(apartment_data) > 6 else "Не указано"
         price = int(price_str)
     except Exception as e:
@@ -209,7 +227,7 @@ async def cmd_add_and_send(message: types.Message, state: FSMContext):
 
     # Добавляем квартиру в базу данных
     apartment_id, matching_clients = await add_apartment(
-        owner, title, price, rooms, district, period, info, file_ids
+        agent, title, price, rooms, district, period, info, file_ids
     )
     await message.answer(f"Квартира добавлена с ID {apartment_id}.")
 
@@ -222,7 +240,7 @@ async def cmd_add_and_send(message: types.Message, state: FSMContext):
             f"📍 Адрес: {district}\n"
             f"⌛ Период: {period}\n"
             f"ℹ️ Инфо: {info}\n"
-            f"Контакт: @Olkyl"
+            f"Контакт: @{agent}"
         )
         await message.answer(
             f"Найдено совпадений по параметрам {len(matching_clients)}."
@@ -252,14 +270,23 @@ async def cmd_add_and_send(message: types.Message, state: FSMContext):
 @dp.message(Command("start"))
 async def send_welcome(message: types.Message, state: FSMContext):
     await state.clear()
+
     await message.answer(
-        "👋 Здравствуйте! Я ваш помощник по поиску квартир в аренду.\n\n✅ Укажите желаемые параметры и я буду следить за новыми предложениями. \n\n🆕 Как только появятся квартиры, соответствующие вашим критериям, я отправлю вам информацию! 🚀"
+        "👋 Здравствуйте! Я ваш помощник по поиску квартир в аренду.\n\n✅ Укажите желаемые параметры и я буду следить за новыми предложениями. \n\n🆕 Как только появятся квартиры, соответствующие вашим критериям, я отправлю вам информацию! 🚀",
+        reply_markup=main_menu,
     )
     user_id = message.from_user.id
     user_name = message.from_user.username
     await state.update_data(user_id=user_id)
     await state.update_data(user_name=user_name)
     await message.answer("Выберите параметры:", reply_markup=inline_kb)
+
+
+# Обработчик кнопки "Перезапустить бота"
+@dp.message(F.text == "Перезапустить бота")
+async def restart_bot(message: types.Message, state: FSMContext):
+    await state.clear()
+    await send_welcome(message, state)  # /start
 
 
 # Обработка выбора "Цена"
@@ -326,8 +353,6 @@ async def confirm_rooms(callback: types.CallbackQuery, state: FSMContext):
 
 
 # Обработка выбора срока
-
-
 @dp.callback_query(F.data == "button_period")
 async def choosing_period(callback: types.CallbackQuery, state: FSMContext):
     await callback.message.edit_text(
@@ -342,7 +367,6 @@ async def confirm_period_choice(callback: types.CallbackQuery, state: FSMContext
 
     await state.update_data(period=period)
     await callback.message.edit_text(f"Вы выбрали: {period}")
-
     await return_to_main_menu(callback, state)
 
 
@@ -356,17 +380,16 @@ async def choosing_district(callback: types.CallbackQuery, state: FSMContext):
     await state.set_state(Selection.choosing_district)
 
 
-# Обработка выбора конкретного района
-@dp.callback_query(F.data.in_(districts))  # Обрабатываем кнопки
+@dp.callback_query(F.data.in_(districts))
 async def confirm_district(callback: types.CallbackQuery, state: FSMContext):
     district = callback.data
     data = await state.get_data()
     selected_districts = data.get("districts", [])
 
     if district in selected_districts:
-        selected_districts.remove(district)  # Убираем, если уже выбрано
+        selected_districts.remove(district)
     else:
-        selected_districts.append(district)  # Добавляем в список
+        selected_districts.append(district)
 
     await state.update_data(districts=selected_districts)
     await callback.message.edit_text(
@@ -415,7 +438,7 @@ async def delete_data(callback: types.CallbackQuery, state: FSMContext):
             parse_mode="HTML",
         )
         await state.clear()
-        # Обновляем состояние, оставляя только user_id и user_name, td
+
         await state.update_data(
             user_id=user_id,
             user_name=user_name,
@@ -453,14 +476,6 @@ async def save_data(callback: types.CallbackQuery, state: FSMContext):
         user_name,
     )
     await callback.answer("Данные сохранены!")
-    finish_messages = [
-        "Параметры сохранены! Мы уведомим вас, как только появится подходящее объявление.",
-        "Параметры обновлены. Мы сообщим вам, как только найдётся квартира по вашим критериям.",
-        "Ваши параметры обновлены! Оповестим вас, как только появятся новые подходящие варианты.",
-        "Настройки поиска обновлены. Вы получите уведомление, как только появится квартира по вашим параметрам.",
-        "Параметры успешно обновлены! Мы сообщим вам о новых подходящих объявлениях.",
-        "Ваши параметры обновлены. Теперь мы ищем квартиру по актуальным настройкам и уведомим вас при появлении подходящего варианта.",
-    ]
 
     save_count += 1
 
@@ -489,10 +504,8 @@ async def save_data(callback: types.CallbackQuery, state: FSMContext):
         await state.update_data(save_count=save_count)
     except AiogramError as e:
         if "message is not modified" in str(e):
-            # Логируем, но не прерываем выполнение, если текст не изменился
             logging.info(f"Сообщение не было изменено: {finish_message}")
         else:
-            # Если другая ошибка Telegram, отправляем новое сообщение
             logging.error(f"Ошибка Telegram при редактировании сообщения: {e}")
             sent_message = await callback.message.answer(
                 finish_message, parse_mode="HTML"

@@ -103,9 +103,8 @@ async def add_apartment(owner, name, price, rooms, district, period, info, photo
                 photo_id=photo_id,
             )
             session.add(new_apartment)
-            await session.flush()  # Сохраняем объект, чтобы получить ID
+            await session.flush()
 
-            # После добавления квартиры ищем подходящих клиентов
             matching_clients = await find_matching_clients(new_apartment)
 
         await session.commit()
@@ -115,8 +114,7 @@ async def add_apartment(owner, name, price, rooms, district, period, info, photo
 async def find_matching_clients(apartment):
     """Поиск клиентов, чьи параметры совпадают с новой квартирой."""
     async with async_session() as session:
-        # Базовый запрос для поиска клиентов
-        query = select(Client).where(Client.status == "Y")  # Только активные клиенты
+        query = select(Client).where(Client.status == "Y")
 
         # Условия фильтрации
         if apartment.price:
@@ -135,5 +133,3 @@ async def find_matching_clients(apartment):
         clients = result.scalars().all()
         print(f"Найденные клиенты: {clients}")
         return [client.user_id for client in clients]
-
-    # Возвращаем ID квартиры и список клиентов
