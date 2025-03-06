@@ -92,7 +92,7 @@ inline_kb = InlineKeyboardMarkup(
 # Главное меню с кнопкой "Перезапустить бота"
 main_menu = ReplyKeyboardMarkup(
     keyboard=[
-        [KeyboardButton(text="Перезапустить бота")],
+        [KeyboardButton(text="Начать сначала")],
     ],
     resize_keyboard=True,
 )
