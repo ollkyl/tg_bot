@@ -4,7 +4,7 @@ import asyncio
 from telethon.errors import ChatWriteForbiddenError
 
 
-env_values = dotenv_values(".env")  # Загружаем .env в виде словаря
+env_values = dotenv_values(".env")
 
 api_id = int(env_values.get("C_API_ID"))
 api_hash = env_values.get("C_API_HASH")
@@ -98,8 +98,79 @@ channels_with_links = [
     "inspacesDubaiRent",
     "rentapartment_dubai_uae",
     "dubaysk_arenda",
+    "my_dubai_chat",
+    "Dubaichatlife",
+    "uae_chat_travel",
+    "poisk_dubai",
+    "dubai_chat_rus",
+    "DubaiRentArenda",
+    "dubai_chat_ads",
+    "oae_realestate_dubai",
+    "rent_dubai_apt",
+    "rent_dubai1",
+    "dubaihome2",
+    "RealtyDubay",
+    "realestate_dxb_uae",
+    "dubaiapartments2022",
+    "UAEDubai_Realty",
+    "dubai_cha",
+    "arenda_dubai_oae",
+    "arenda_dubaysk",
+    "dubai_helps",
+    "dubaichat_rus",
+    "dubai_rentt",
+    "myhomeindubai",
+    "arenda_dubaii",
+    "dubai_appart",
+    "homes_dubai",
+    "dubai_rent_uae",
+    "dubai_propertyy",
+    "uae_apartments_rent",
+    "perviv_dubae",
+    "tutdubai",
+    "chatoae",
+    "realestate_dubai_rus",
+    "Dubai_Go_Travel",
+    "dubai1top",
+    "depaldo_chat",
+    "dubai_dlya_svoih",
+    "dubai_chat_biznes",
+    "Kazakhstan_dubai_uae",
+    "Dubaydagi_Uzbeklarr",
+    "dubai_baraxolka",
+    "dirham_dubai",
+    "dubaiApartments1",
+    "ryska_Dubai",
+    "dubai_barakholka",
+    "dubai_ukraine",
+    "dubai_chat_russians",
+    "kyrgyzy_v_dubaee",
+    "reklamadlyavsehuae",
+    "dubaiclubgirls",
+    "dubai_uae_oae_russkiye_v_dubae",
+    "dubaichatik1",
+    "kazakhcommunityuae",
+    "kyrgysz_in_dubai",
+    "uazbekindubai",
+    "dubaionline247",
+    "sharjashat",
+    "design467",
+    "dubai_chat_russia",
+    "placeget",
+    "vDubai_rus",
+    "dubai_chatt",
+    "Emiraty_Dubai",
+    "dubairealtyinvest",
+    "UAE_DOM",
+    "abu_rent",
+    "ours_chat_dubai",
+    "ours_main_ads_are_bot",
+    "nedviga_dubai",
+    "dubai_main",
+    "dubairenta",
 ]
-sent_messages = set()  # Храним ID уже пересланных сообщений
+
+sent_messages = set()
 
 
 async def send_latest_posts():
@@ -130,7 +201,7 @@ async def send_latest_posts():
             await asyncio.gather(msg_task(), msg2_task())
 
             print("⚠ Ожидание 30 секунд перед новой проверкой...")
-            await asyncio.sleep(30)  # Ждём перед следующей проверкой
+            await asyncio.sleep(30)
 
 
 async def forward_to_channels(client, channels, message):
