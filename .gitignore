@@ -1,8 +1,3 @@
-/.env
-/.venv
-/session_name.session
-/tg_auto.py
-/tg_auto2.py
 # Папки виртуальных окружений
 .venv/
 venv/
