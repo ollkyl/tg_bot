@@ -11,7 +11,6 @@ from sqlalchemy import (
     update,
     delete,
     select,
-    or_
 )
 from dotenv import dotenv_values
 
