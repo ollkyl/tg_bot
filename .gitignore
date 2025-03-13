@@ -3,3 +3,32 @@
 /session_name.session
 /tg_auto.py
 /tg_auto2.py
+# Папки виртуальных окружений
+.venv/
+venv/
+env/
+.env
+photos/
+apartments.json
+prompt.py
+test.py
+
+# Кэшированные файлы Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Файлы настроек IDE
+.vscode/
+
+# Файлы операционной системы
+.DS_Store
+Thumbs.db
+
+# Логи
+*.log
+
+# Временные файлы
+*.tmp
+*.session
+*.session-journal
