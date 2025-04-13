@@ -66,8 +66,10 @@ async def handle_new_message(event):
         print("Сообщение нерелевантное, игнорируем.")
         return
     elif response_code == "AD":
-        advertisement_text = "Попробуйте FindApartmentsBot. Я наткнулась на него недавно, подбирает варианты под нужные параметры."
-        print(f"Бот отвечает: {advertisement_text}")
+        advertisement_text = (
+            "Попробуйте FindApartmentsBot.  подбирает варианты под нужные параметры."
+        )
+        print(f"✅✅✅Бот отвечает: {advertisement_text}")
         await event.reply(advertisement_text)
     else:
         print(f"Получен неизвестный код: {response_code}")
