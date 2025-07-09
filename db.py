@@ -26,9 +26,7 @@ DATABASE_URL = f"postgresql+asyncpg://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{D
 
 engine = create_async_engine(DATABASE_URL, echo=True)
 
-async_session = async_sessionmaker(
-    bind=engine, class_=AsyncSession, expire_on_commit=False
-)
+async_session = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
 
 Base = declarative_base()
 
@@ -65,9 +63,7 @@ class Apartment(Base):
 async def add_client(user_id, min_price, max_price, rooms, district, period, user_name):
     async with async_session() as session:
         async with session.begin():
-            stmt_update = (
-                update(Client).where(Client.user_id == user_id).values(status="N")
-            )
+            stmt_update = update(Client).where(Client.user_id == user_id).values(status="N")
             await session.execute(stmt_update)
 
             await session.flush()
@@ -115,12 +111,11 @@ async def add_apartment(owner, name, price, rooms, district, period, info, photo
 async def find_matching_clients(apartment):
     """Поиск клиентов, чьи параметры совпадают с новой квартирой."""
     async with async_session() as session:
-        query = select(Client) 
+        query = select(Client)
         # Условия фильтрации
         if apartment.price:
             query = query.where(
-                (Client.min_price <= apartment.price)
-                & (Client.max_price >= apartment.price)
+                (Client.min_price <= apartment.price) & (Client.max_price >= apartment.price)
             )
 
         if apartment.rooms:
@@ -139,10 +134,10 @@ async def find_matching_clients(apartment):
         clients = result.scalars().all()
         print(f"Найденные клиенты: {clients}")
         return [(client.user_id, client.user_name) for client in clients]
-    
+
+
 async def get_all_users():
     async with async_session() as session:
-     
-        result = await session.execute(select(Client.user_id)) 
+        result = await session.execute(select(Client.user_id))
         users = result.scalars().all()
     return users
