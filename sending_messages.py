@@ -5,6 +5,7 @@ from db import async_session, Apartment
 import requests
 from dotenv import dotenv_values
 from db import find_matching_clients
+from sqlalchemy.sql import select
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)

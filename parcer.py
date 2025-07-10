@@ -3,7 +3,8 @@ import requests
 import os
 import time
 from datetime import datetime, timedelta
-from db import add_apartment, async_session  # Для работы с БД
+from db import add_apartment, async_session
+from sending_messages import send_apartment_notification
 from dotenv import dotenv_values
 
 # Загрузка переменных окружения
@@ -155,10 +156,10 @@ def find_district(district_name):
     for district, areas in district_mapping.items():
         if district_name in areas:
             return district
-    return district_name  # Если не найдено соответствие, возвращаем исходное название
+    return district_name
 
 
-# Проверка и очистка списка каждые 12 часов
+# Проверка и очистка списка
 def cleanup_old_ids():
     current_time = datetime.now()
     if os.path.exists(CLEANUP_FILE):
@@ -172,7 +173,7 @@ def cleanup_old_ids():
         if (current_time - last_cleanup).total_seconds() >= CLEANUP_INTERVAL_HOURS * 3600:
             if os.path.exists(ID_LIST_FILE):
                 with open(ID_LIST_FILE, "w") as f:
-                    f.write("")  # Очистка файла
+                    f.write("")
             with open(CLEANUP_FILE, "w") as f:
                 f.write(str(current_time.timestamp()))
     else:
@@ -186,12 +187,12 @@ if os.path.exists(ID_LIST_FILE):
     with open(ID_LIST_FILE, "r") as f:
         existing_ids = set(line.strip() for line in f if line.strip())
 
-# Текущее время и время начала (30 минут назад)
+# Текущее время
 current_time = datetime.now()
 start_time = current_time - timedelta(minutes=30)
 start_timestamp = int(start_time.timestamp())
 
-# Запрос к Algolia для поиска новых объявлений
+# Запрос к Algolia
 all_hits = []
 page = 0
 while True:
@@ -213,17 +214,17 @@ while True:
             break
         all_hits.extend(hits)
         page += 1
-        time.sleep(1)  # Задержка для избежания блокировки
+        time.sleep(1)
     else:
         print(f"Ошибка: {response.status_code}, {response.text}")
         break
 
-# Обработка новых объявлений
+# Обработка
 if all_hits:
     new_hits = [hit for hit in all_hits if hit["externalID"] not in existing_ids]
 
     async def process_new_ads():
-        stats = {"successful_adds": 0}  # Счётчик успешных добавлений
+        stats = {"successful_adds": 0}
         async with async_session() as session:
             async with session.begin():
                 for hit in new_hits:
@@ -235,11 +236,8 @@ if all_hits:
                     )
                     if object_id:
                         try:
-                            start_time = time.time()
                             detail_url = f"{ALGOLIA_BASE_URL}/{object_id}"
                             detail_response = requests.get(detail_url, headers=headers, timeout=10)
-                            end_time = time.time()
-                            print(f"Время запроса: {end_time - start_time:.2f} сек")
                             if detail_response.status_code == 200:
                                 detail_hit = detail_response.json()
                                 owner = detail_hit.get("ownerAgent", {}).get("name", "Unknown")
@@ -258,16 +256,24 @@ if all_hits:
                                     else []
                                 )
 
-                                try:
-                                    new_apartment_id, matching_clients = await add_apartment(
-                                        owner, name, price, rooms, district, period, info, photo_id
-                                    )
-                                    print(
-                                        f"Сохранено в БД: ID={new_apartment_id}, Клиентов: {len(matching_clients)}"
-                                    )
-                                    stats["successful_adds"] += 1
-                                except Exception as e:
-                                    print(f"Ошибка сохранения в БД для {external_id}: {e}")
+                                apartment_id, matching_clients = await add_apartment(
+                                    owner,
+                                    name,
+                                    price,
+                                    rooms,
+                                    district,
+                                    period,
+                                    info,
+                                    photo_id,
+                                    object_id,
+                                )
+                                print(
+                                    f"Сохранено в БД: ID={apartment_id}, Клиентов: {len(matching_clients)}"
+                                )
+                                stats["successful_adds"] += 1
+
+                                # Вызов функции отправки
+                                await send_apartment_notification(apartment_id)
                             else:
                                 print(
                                     f"Ошибка API для {external_id}: {detail_response.status_code}"
@@ -277,27 +283,23 @@ if all_hits:
                     time.sleep(1)
         print(f"Всего сохранено в БД: {stats['successful_adds']} объявлений.")
 
-    # Выполнение асинхронной обработки
     asyncio.run(process_new_ads())
 
-# Сохранение новых ID в файл
+# Сохранение новых ID
 if new_hits:
     with open(ID_LIST_FILE, "a") as f:
         for hit in new_hits:
             f.write(f"{hit['externalID']}\n")
-    existing_ids.update(hit["externalID"] for hit in new_hits)
     with open(LOG_FILE, "a") as f:
         for hit in new_hits:
             f.write(
                 f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - ID: {hit['externalID']}, Title: {hit['title']}\n"
             )
 
-    # Вывод результатов (только 10)
     print(f"Найдено новых объявлений: {len(new_hits)}")
     for hit in new_hits[:10]:
         print(f"ID: {hit['externalID']}, Title: {hit['title']}, Price: {hit['price']}")
 else:
     print("Нет новых данных.")
 
-# Выполняем очистку перед выходом
 cleanup_old_ids()

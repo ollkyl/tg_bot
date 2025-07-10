@@ -58,6 +58,7 @@ class Apartment(Base):
     info = Column(String, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
     photo_id = Column(ARRAY(String))
+    object_id = Column(String, nullable=True)
 
 
 async def add_client(user_id, min_price, max_price, rooms, district, period, user_name):
@@ -85,7 +86,7 @@ async def add_client(user_id, min_price, max_price, rooms, district, period, use
         await session.commit()
 
 
-async def add_apartment(owner, name, price, rooms, district, period, info, photo_id):
+async def add_apartment(owner, name, price, rooms, district, period, info, photo_id, object_id):
     """Добавление квартиры и уведомление подходящих клиентов."""
     async with async_session() as session:
         async with session.begin():
@@ -98,6 +99,7 @@ async def add_apartment(owner, name, price, rooms, district, period, info, photo
                 district=district,
                 info=info,
                 photo_id=photo_id,
+                object_id=object_id,
             )
             session.add(new_apartment)
             await session.flush()
