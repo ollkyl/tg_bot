@@ -3,10 +3,7 @@
 venv/
 env/
 .env
-photos/
-apartments.json
-prompt.py
-test.py
+
 
 # Кэшированные файлы Python
 __pycache__/
@@ -27,3 +24,6 @@ Thumbs.db
 *.tmp
 *.session
 *.session-journal
+
+cleanup_time.txt
+id_list.txt
