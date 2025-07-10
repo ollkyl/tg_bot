@@ -1,9 +1,16 @@
+import asyncio
 import requests
-import json
 import os
 import time
 from datetime import datetime, timedelta
 from db import add_apartment, async_session  # Для работы с БД
+from dotenv import dotenv_values
+
+# Загрузка переменных окружения
+env_values = dotenv_values(".env")
+ALGOLIA_BASE_URL = env_values.get("ALGOLIA_BASE_URL")
+ALGOLIA_API_KEY = env_values.get("ALGOLIA_API_KEY")
+ALGOLIA_APP_ID = env_values.get("ALGOLIA_APP_ID")
 
 # Файлы для хранения
 ID_LIST_FILE = "id_list.txt"
@@ -12,14 +19,12 @@ LOG_FILE = "new_ads.log"
 CLEANUP_INTERVAL_HOURS = 12  # Интервал очистки в часах
 
 # Эндпоинт и заголовки
-base_url = os.getenv("ALGOLIA_BASE_URL")
 headers = {
-    "X-Algolia-API-Key": os.getenv("ALGOLIA_API_KEY"),
-    "X-Algolia-Application-Id": os.getenv("ALGOLIA_APP_ID"),
+    "X-Algolia-API-Key": ALGOLIA_API_KEY,
+    "X-Algolia-Application-Id": ALGOLIA_APP_ID,
     "Content-Type": "application/json",
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/138.0.0.0 Safari/537.36",
 }
-
 
 district_mapping = {
     "Citywalk": [
@@ -150,6 +155,7 @@ def find_district(district_name):
     for district, areas in district_mapping.items():
         if district_name in areas:
             return district
+    return district_name  # Если не найдено соответствие, возвращаем исходное название
 
 
 # Проверка и очистка списка каждые 12 часов
@@ -158,10 +164,11 @@ def cleanup_old_ids():
     if os.path.exists(CLEANUP_FILE):
         with open(CLEANUP_FILE, "r") as f:
             content = f.read().strip()
-            if content:
-                last_cleanup = datetime.fromtimestamp(float(content))
-            else:
-                last_cleanup = current_time - timedelta(hours=CLEANUP_INTERVAL_HOURS * 2)
+            last_cleanup = (
+                datetime.fromtimestamp(float(content))
+                if content
+                else current_time - timedelta(hours=CLEANUP_INTERVAL_HOURS * 2)
+            )
         if (current_time - last_cleanup).total_seconds() >= CLEANUP_INTERVAL_HOURS * 3600:
             if os.path.exists(ID_LIST_FILE):
                 with open(ID_LIST_FILE, "w") as f:
@@ -211,23 +218,17 @@ while True:
         print(f"Ошибка: {response.status_code}, {response.text}")
         break
 
-# Вывод структуры данных для анализа
-print("Полная структура данных из all_hits:")
-for hit in all_hits[:10]:  # Ограничим вывод первыми 10 записями для удобства
-    print(json.dumps(hit, indent=2))
-
 # Обработка новых объявлений
 if all_hits:
     new_hits = [hit for hit in all_hits if hit["externalID"] not in existing_ids]
-    stats = {"successful_adds": 0}  # Используем словарь для подсчёта
 
-    # Обновлённая функция
     async def process_new_ads():
+        stats = {"successful_adds": 0}  # Счётчик успешных добавлений
         async with async_session() as session:
             async with session.begin():
                 for hit in new_hits:
                     external_id = hit["externalID"]
-                    object_id = hit.get("objectID")  # Проверяем наличие objectID
+                    object_id = hit.get("objectID")
                     created_at = datetime.fromtimestamp(hit.get("createdAt", 0)).strftime("%H:%M")
                     print(
                         f"Обработка: externalID={external_id}, objectID={object_id}, createdAt={created_at}"
@@ -235,17 +236,16 @@ if all_hits:
                     if object_id:
                         try:
                             start_time = time.time()
-                            detail_url = f"{base_url}/{object_id}"
+                            detail_url = f"{ALGOLIA_BASE_URL}/{object_id}"
                             detail_response = requests.get(detail_url, headers=headers, timeout=10)
                             end_time = time.time()
-                            print(f"Ответ API: {detail_response.text}")  # Отладочный вывод
                             print(f"Время запроса: {end_time - start_time:.2f} сек")
                             if detail_response.status_code == 200:
                                 detail_hit = detail_response.json()
                                 owner = detail_hit.get("ownerAgent", {}).get("name", "Unknown")
                                 name = detail_hit.get("title", "No title")
                                 price = detail_hit.get("price", 0.0)
-                                rooms = detail_hit.get("rooms", 0)
+                                rooms = str(detail_hit.get("rooms", 0))
                                 district_area = detail_hit.get("location", [{}])[-1].get(
                                     "name", "Unknown"
                                 )
@@ -255,31 +255,30 @@ if all_hits:
                                 photo_id = (
                                     [detail_hit.get("coverPhoto", {}).get("externalID")]
                                     if detail_hit.get("coverPhoto")
-                                    else None
+                                    else []
                                 )
 
-                                new_apartment_id, matching_clients = await add_apartment(
-                                    owner, name, price, str(rooms), district, period, info, photo_id
-                                )
-                                print(
-                                    f"Сохранено в БД: ID={new_apartment_id}, Клиентов: {len(matching_clients)}"
-                                )
-                                stats["successful_adds"] += 1  # Обновляем счётчик в словаре
+                                try:
+                                    new_apartment_id, matching_clients = await add_apartment(
+                                        owner, name, price, rooms, district, period, info, photo_id
+                                    )
+                                    print(
+                                        f"Сохранено в БД: ID={new_apartment_id}, Клиентов: {len(matching_clients)}"
+                                    )
+                                    stats["successful_adds"] += 1
+                                except Exception as e:
+                                    print(f"Ошибка сохранения в БД для {external_id}: {e}")
                             else:
                                 print(
-                                    f"Ошибка при детальном запросе для {external_id}: {detail_response.status_code}, Тело ответа: {detail_response.text}"
+                                    f"Ошибка API для {external_id}: {detail_response.status_code}"
                                 )
                         except requests.RequestException as e:
                             print(f"Ошибка запроса для {external_id}: {str(e)}")
-                    else:
-                        print(f"Нет objectID для {external_id}")
                     time.sleep(1)
+        print(f"Всего сохранено в БД: {stats['successful_adds']} объявлений.")
 
     # Выполнение асинхронной обработки
-    import asyncio
-
     asyncio.run(process_new_ads())
-    print(f"Всего сохранено в БД: {stats['successful_adds']} объявлений.")
 
 # Сохранение новых ID в файл
 if new_hits:
@@ -295,10 +294,10 @@ if new_hits:
 
     # Вывод результатов (только 10)
     print(f"Найдено новых объявлений: {len(new_hits)}")
-    for hit in new_hits[:10]:  # Ограничение до 10
+    for hit in new_hits[:10]:
         print(f"ID: {hit['externalID']}, Title: {hit['title']}, Price: {hit['price']}")
 else:
-    print("Нет данных.")
+    print("Нет новых данных.")
 
 # Выполняем очистку перед выходом
 cleanup_old_ids()
