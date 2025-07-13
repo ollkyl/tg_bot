@@ -13,6 +13,10 @@ from sqlalchemy import (
     select,
 )
 from dotenv import dotenv_values
+import logging
+
+logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
+
 
 env_values = dotenv_values(".env")
 
@@ -57,8 +61,9 @@ class Apartment(Base):
     period = Column(String, nullable=True)
     info = Column(String, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
-    photo_id = Column(ARRAY(String))
+    photo_ids = Column(ARRAY(String))
     object_id = Column(String, nullable=True)
+    link = Column(String)
 
 
 async def add_client(user_id, min_price, max_price, rooms, district, period, user_name):
@@ -86,7 +91,9 @@ async def add_client(user_id, min_price, max_price, rooms, district, period, use
         await session.commit()
 
 
-async def add_apartment(owner, name, price, rooms, district, period, info, photo_id, object_id):
+async def add_apartment(
+    owner, name, price, rooms, district, period, info, photo_ids, object_id, link
+):
     """Добавление квартиры и уведомление подходящих клиентов."""
     async with async_session() as session:
         async with session.begin():
@@ -98,8 +105,9 @@ async def add_apartment(owner, name, price, rooms, district, period, info, photo
                 rooms=rooms,
                 district=district,
                 info=info,
-                photo_id=photo_id,
+                photo_ids=photo_ids,
                 object_id=object_id,
+                link=link,
             )
             session.add(new_apartment)
             await session.flush()

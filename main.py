@@ -1,11 +1,10 @@
 from aiogram import Bot, Dispatcher
 import asyncio
-import logging
+
 from dotenv import dotenv_values
 from handlers import register_handlers
 from db import engine, Base
 
-logging.basicConfig(level=logging.INFO)
 
 env_values = dotenv_values(".env")
 

@@ -2,7 +2,7 @@ from aiogram import F, types
 from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.exceptions import AiogramError
-import logging
+
 from keyboards import (
     inline_kb,
     main_menu,
@@ -41,7 +41,7 @@ def register_handlers(dp, bot, ADMIN_ID):
             try:
                 await bot.send_message(user_id, broadcast_message)
             except Exception as e:
-                logging.error(f"Не удалось отправить сообщение пользователю {user_id}: {e}")
+                print(f"Не удалось отправить сообщение пользователю {user_id}: {e}")
                 continue
         await message.answer("Рассылка завершена.")
         await state.finish()
@@ -343,9 +343,8 @@ def register_handlers(dp, bot, ADMIN_ID):
             await state.update_data(save_count=save_count)
         except AiogramError as e:
             if "message is not modified" in str(e):
-                logging.info(f"Сообщение не было изменено: {finish_message}")
+                print(f"Сообщение не было изменено: {finish_message}")
             else:
-                logging.error(f"Ошибка Telegram при редактировании сообщения: {e}")
                 sent_message = await callback.message.answer(finish_message, parse_mode="HTML")
                 await state.update_data(confirmation_message_id=sent_message.message_id)
 
@@ -388,8 +387,8 @@ def register_handlers(dp, bot, ADMIN_ID):
                 await state.update_data(selected_message_id=sent_message.message_id)
         except AiogramError as e:
             if "message is not modified" in str(e):
-                logging.warning("Сообщение не изменилось.")
+                print("Сообщение не изменилось.")
             else:
-                logging.error(f"Ошибка при редактировании сообщения: {e}")
+                print(f"Ошибка при редактировании сообщения: {e}")
                 raise
         await callback.message.edit_text("Выберите параметр:", reply_markup=inline_kb)
