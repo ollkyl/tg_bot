@@ -85,18 +85,22 @@ def get_count_of_rooms_keyboard(rooms, selected_rooms):
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
-def get_period_keyboard():
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="только помесячно", callback_data="помесячно")],
-            [
-                InlineKeyboardButton(
-                    text="от года или помесячно", callback_data="от года или помесячно"
-                )
-            ],
-        ]
-        + [[InlineKeyboardButton(text="Назад", callback_data="back")]]
-    )
+def get_period_keyboard(selected_periods):
+    options = [
+        ("помесячно", "monthly"),
+        ("посуточно", "daily"),
+        ("от года", "yearly"),
+    ]
+
+    buttons = []
+    for label, value in options:
+        text = f"✅ {label}" if value in selected_periods else label
+        buttons.append([InlineKeyboardButton(text=text, callback_data=value)])
+
+    buttons.append([InlineKeyboardButton(text="Готово", callback_data="period_done")])
+    buttons.append([InlineKeyboardButton(text="Назад", callback_data="back")])
+
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
 def get_district_keyboard(districts, selected_districts):

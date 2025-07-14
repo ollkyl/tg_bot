@@ -1,25 +1,39 @@
-# parser.py
 import asyncio
 import aiohttp
 import os
 import time
+import re
 from datetime import datetime, timedelta
 from db import add_apartment, async_session, Apartment
 from sending_messages import send_apartment_notification
 from dotenv import dotenv_values
 from sqlalchemy.sql import select
+import json
+from bs4 import BeautifulSoup
 
 # Загрузка переменных окружения
 env_values = dotenv_values(".env")
 ALGOLIA_BASE_URL = env_values.get("ALGOLIA_BASE_URL")
 ALGOLIA_API_KEY = env_values.get("ALGOLIA_API_KEY")
 ALGOLIA_APP_ID = env_values.get("ALGOLIA_APP_ID")
+BAYUT_COOKIE = env_values.get("BAYUT_COOKIE")  # Добавляем куки
 
 # Файлы для хранения
 ID_LIST_FILE = "id_list.txt"
 CLEANUP_FILE = "cleanup_time.txt"
 LOG_FILE = "new_ads.log"
-CLEANUP_INTERVAL_HOURS = 12  # Интервал очистки в часах
+CLEANUP_INTERVAL_HOURS = 12
+
+# Загрузка district_mapping
+try:
+    with open("districts.json", "r", encoding="utf-8") as f:
+        district_mapping = json.load(f)
+except FileNotFoundError:
+    print("Ошибка: Файл districts.json не найден.")
+    district_mapping = {}
+except json.JSONDecodeError as e:
+    print(f"Ошибка: Некорректный JSON в districts.json: {e}.")
+    district_mapping = {}
 
 # Заголовки для запросов
 headers = {
@@ -27,134 +41,64 @@ headers = {
     "X-Algolia-Application-Id": ALGOLIA_APP_ID,
     "Content-Type": "application/json",
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/138.0.0.0 Safari/537.36",
+    "Referer": "https://www.bayut.com/",
+    "Origin": "https://www.bayut.com",
+    "Accept-Language": "ru",
 }
+if BAYUT_COOKIE:
+    headers["Cookie"] = BAYUT_COOKIE
 
-district_mapping = {
-    "Citywalk": [
-        "Al Wasl",
-        "Al Satwa",
-        "Al Jaddaf",
-        "Za'abeel",
-        "Al Karama",
-        "Al Badaa",
-        "Al Manara",
-        "Al Hudaiba",
-    ],
-    "Bluewaters": ["Bluewaters Island", "Jumeirah Beach Residence (JBR)"],
-    "The Palm Jumeirah": [
-        "Palm Jumeirah",
-        "Jumeirah",
-        "Umm Suqeim",
-        "Jumeirah Islands",
-        "Emirates Hills",
-        "Me'aisem 1",
-        "Umm Al Sheif",
-        "Pearl Jumeirah",
-    ],
-    "Dubai Marina": [
-        "Dubai Marina",
-        "Jumeirah Lake Towers (JLT)",
-        "Jumeirah Heights",
-        "The Springs",
-        "The Meadows",
-        "The Lakes",
-    ],
-    "Business Bay": ["Business Bay", "Sheikh Zayed Road", "World Trade Centre", "Al Safa"],
-    "Downtown": ["Downtown Dubai", "DIFC", "Za'abeel", "Bur Dubai", "Al Mina"],
-    "DIFC": ["DIFC", "Sheikh Zayed Road", "World Trade Centre"],
-    "ZAABEL + DHCC": [
-        "Za'abeel",
-        "Al Jaddaf",
-        "Al Rashidiya",
-        "Muhaisnah",
-        "Al Twar",
-        "Nad Al Hamar",
-        "Al Warqaa",
-        "Academic City",
-    ],
-    "Dubai Media City + Dubai Internet City": [
-        "Dubai Media City",
-        "Dubai Internet City",
-        "Barsha Heights (Tecom)",
-        "Al Sufouh",
-    ],
-    "JLT": ["Jumeirah Lake Towers (JLT)", "Jumeirah Heights"],
-    "JVC": [
-        "Jumeirah Village Circle (JVC)",
-        "Arjan",
-        "Tilal Al Ghaf",
-        "Majan",
-        "Serena",
-        "City of Arabia",
-        "Dubailand",
-        "Reem",
-        "The Villa",
-    ],
-    "Meydan: Sobha + Azizi Riviera": [
-        "Meydan City",
-        "Sobha Hartland",
-        "Mohammed Bin Rashid City",
-        "Remraam",
-        "DAMAC Hills",
-        "DAMAC Hills 2 (Akoya by DAMAC)",
-        "Al Barari",
-        "Falcon City of Wonders",
-        "Hadaeq Sheikh Mohammed Bin Rashid",
-    ],
-    "Dubai Design District + Al Jaddaf": [
-        "Al Jaddaf",
-        "Dubai Design District",
-        "Ras Al Khor",
-        "Al Warsan",
-        "Dubai Festival City",
-    ],
-    "JVT": [
-        "Jumeirah Village Triangle (JVT)",
-        "Jumeirah Park",
-        "The Springs",
-        "The Meadows",
-        "The Greens",
-        "The Views",
-    ],
-    "Creek Harbour": [
-        "Dubai Creek Harbour",
-        "Nad Al Sheba",
-        "Culture Village (Jaddaf Waterfront)",
-        "Wadi Al Shabak",
-        "Wadi Al Amardi",
-    ],
-    "Dubai Production City + Sport City + Motor City": [
-        "Dubai Production City (IMPZ)",
-        "Dubai Sports City",
-        "Motor City",
-        "Jumeirah Golf Estates",
-        "Dubai Science Park",
-        "Living Legends",
-        "Dubai Studio City",
-    ],
-    "Al Furjan + Discovery Garden": [
-        "Al Furjan",
-        "Discovery Gardens",
-        "The Gardens",
-        "Jebel Ali",
-        "Dubai South",
-        "Dubai Industrial City",
-        "Expo City",
-    ],
-    "Al Quoz": ["Al Quoz", "Al Khawaneej", "Al Awir", "Al Mizhar", "Mushraif", "Bukadra"],
-    "Al Barsha + Arjan": [
-        "Al Barsha",
-        "Arjan",
-        "Barsha Heights (Tecom)",
-        "Al Sufouh",
-        "Mirdif",
-        "Dubai Land Residence Complex",
-        "Green Community",
-    ],
-}
+
+async def get_info(session, external_id):
+    url = f"https://www.bayut.com/property/details-{external_id}.html"
+    try:
+        async with session.get(url, headers=headers) as response:
+            if response.status == 200:
+                html = await response.text()
+                soup = BeautifulSoup(html, "html.parser")
+                desc_block = soup.find("div", class_="_0a5f69b8")  # Проверь актуальный класс
+                if desc_block:
+                    description = desc_block.get_text(strip=True)
+                    description = re.sub(r"\s+", " ", description).strip()[:500]
+                    return description
+                print(f"HTML: Не найдено описание для external_id={external_id}")
+                return "No description found"
+            print(f"Ошибка загрузки HTML страницы {external_id}: статус {response.status}")
+            return "No description found"
+    except Exception as e:
+        print(f"Ошибка при получении описания через HTML: {e}")
+        return "No description"
+
+
+async def get_contact_phone_from_html(session, external_id):
+    url = f"https://www.bayut.com/property/details-{external_id}.html"
+    try:
+        async with session.get(url, headers=headers) as response:
+            if response.status == 200:
+                html = await response.text()
+                soup = BeautifulSoup(html, "html.parser")
+                # Проверяем основной селектор
+                phone_elem = soup.select_one("span._95c634a6._2454d03d > a > span")
+                if phone_elem:
+                    return phone_elem.get_text(strip=True)
+                # Альтернатива через tel:
+                tel_link = soup.find("a", href=lambda x: x and x.startswith("tel:"))
+                if tel_link:
+                    return tel_link["href"].replace("tel:", "").strip()
+                print(f"HTML: Не найден телефон для external_id={external_id}")
+                return "No phone found"
+            print(
+                f"Ошибка загрузки HTML страницы для телефона {external_id}: статус {response.status}"
+            )
+            return "No phone found"
+    except Exception as e:
+        print(f"Ошибка получения телефона: {e}")
+        return "No phone"
 
 
 def find_district(district_name):
+    if not district_mapping:
+        return district_name
     for district, areas in district_mapping.items():
         if district_name in areas:
             return district
@@ -208,6 +152,7 @@ async def fetch_hits(session, page):
     ) as response:
         if response.status == 200:
             return await response.json()
+        print(f"Ошибка Algolia API для page={page}: статус {response.status}")
         return {"results": [{"hits": []}]}
 
 
@@ -216,6 +161,7 @@ async def fetch_detail(session, object_id):
     async with session.get(detail_url, headers=headers) as response:
         if response.status == 200:
             return await response.json()
+        print(f"Ошибка Algolia API для object_id={object_id}: статус {response.status}")
         return None
 
 
@@ -223,7 +169,6 @@ async def process_new_ads():
     stats = {"successful_adds": 0}
     async with aiohttp.ClientSession() as session:
         try:
-            # Запрос к Algolia
             all_hits = []
             page = 0
             while True:
@@ -233,9 +178,8 @@ async def process_new_ads():
                     break
                 all_hits.extend(hits)
                 page += 1
-                await asyncio.sleep(1)  # Задержка для API Algolia
+                await asyncio.sleep(1)
 
-            # Обработка
             if all_hits:
                 new_hits = [hit for hit in all_hits if hit["externalID"] not in existing_ids]
             else:
@@ -266,10 +210,14 @@ async def process_new_ads():
 
                                 detail_hit = await fetch_detail(session, object_id)
                                 if detail_hit:
-                                    owner = detail_hit.get("ownerAgent", {}).get("name", "Unknown")
+                                    owner = await get_contact_phone_from_html(session, external_id)
+                                    if owner == "No phone found":
+                                        owner = detail_hit.get("phoneNumber", {}).get(
+                                            "mobile", "Unknown"
+                                        )
                                     name = detail_hit.get("title", "No title")
                                     price = detail_hit.get("price", 0.0)
-                                    rooms = str(detail_hit.get("rooms", 0))
+                                    rooms = str(detail_hit.get("rooms", "Studio"))
                                     location_data = detail_hit.get("location", [])
                                     district_area = next(
                                         (
@@ -281,15 +229,29 @@ async def process_new_ads():
                                     )
                                     district = find_district(district_area)
                                     period = detail_hit.get("rentFrequency", "yearly")
-                                    info = detail_hit.get("description", "No description")
-                                    cover_id = detail_hit.get("coverPhoto", {}).get("externalID")
+                                    info = await get_info(session, external_id)
+                                    if info == "No description found":
+                                        keywords = (
+                                            ", ".join(detail_hit.get("keywords", [])[:5])
+                                            or "Unknown"
+                                        )
+                                        amenities = (
+                                            ", ".join(detail_hit.get("amenities", [])[:3])
+                                            or "Unknown"
+                                        )
+                                        furnishing = detail_hit.get("furnishingStatus", "Unknown")
+                                        area = detail_hit.get("area", "Unknown")
+                                        baths = detail_hit.get("baths", "Unknown")
+                                        info = f"{rooms}-bedroom apartment, {baths} baths, {area} sqm, {furnishing}. Features: {keywords}. Amenities: {amenities}."
+                                    print(f"Описание для {external_id}: {info}")
+                                    cover_id = detail_hit.get("coverPhoto", {}).get(
+                                        "externalID", ""
+                                    )
                                     photo_ids = [
                                         str(photo_id) for photo_id in detail_hit.get("photoIDs", [])
                                     ]
-                                    # Добавляем обложку в начало, если её нет в списке
                                     if cover_id and str(cover_id) not in photo_ids:
                                         photo_ids.insert(0, str(cover_id))
-                                    # Формируем ссылку
                                     link = (
                                         f"https://www.bayut.com/property/details-{external_id}.html"
                                     )
@@ -313,14 +275,13 @@ async def process_new_ads():
 
                                     await send_apartment_notification(apartment_id)
                                 else:
-                                    print(f"Ошибка API для {external_id}: статус ")
+                                    print(f"Ошибка API для {external_id}: нет данных")
                             except Exception as e:
                                 print(f"Ошибка обработки для {external_id}: {str(e)}")
                             await asyncio.sleep(20)
         finally:
-            await session.close()  # Гарантируем закрытие сессии
+            await session.close()
 
-    # Сохранение новых ID
     if new_hits:
         with open(ID_LIST_FILE, "a") as f:
             for hit in new_hits:
@@ -339,6 +300,5 @@ async def process_new_ads():
     cleanup_old_ids()
 
 
-# Запуск асинхронной функции
 if __name__ == "__main__":
     asyncio.run(process_new_ads())

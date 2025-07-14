@@ -1,0 +1,124 @@
+{
+    "Citywalk": [
+        "Al Wasl",
+        "Al Satwa",
+        "Al Jaddaf",
+        "Za'abeel",
+        "Al Karama",
+        "Al Badaa",
+        "Al Manara",
+        "Al Hudaiba"
+    ],
+    "Bluewaters": ["Bluewaters Island", "Jumeirah Beach Residence (JBR)"],
+    "The Palm Jumeirah": [
+        "Palm Jumeirah",
+        "Jumeirah",
+        "Umm Suqeim",
+        "Jumeirah Islands",
+        "Emirates Hills",
+        "Me'aisem 1",
+        "Umm Al Sheif",
+        "Pearl Jumeirah"
+    ],
+    "Dubai Marina": [
+        "Dubai Marina",
+        "Jumeirah Lake Towers (JLT)",
+        "Jumeirah Heights",
+        "The Springs",
+        "The Meadows",
+        "The Lakes"
+    ],
+    "Business Bay": ["Business Bay", "Sheikh Zayed Road", "World Trade Centre", "Al Safa"],
+    "Downtown": ["Downtown Dubai", "DIFC", "Za'abeel", "Bur Dubai", "Al Mina"],
+    "DIFC": ["DIFC", "Sheikh Zayed Road", "World Trade Centre"],
+    "ZAABEL + DHCC": [
+        "Za'abeel",
+        "Al Jaddaf",
+        "Al Rashidiya",
+        "Muhaisnah",
+        "Al Twar",
+        "Nad Al Hamar",
+        "Al Warqaa",
+        "Academic City"
+    ],
+    "Dubai Media City + Dubai Internet City": [
+        "Dubai Media City",
+        "Dubai Internet City",
+        "Barsha Heights (Tecom)",
+        "Al Sufouh"
+    ],
+    "JLT": ["Jumeirah Lake Towers (JLT)", "Jumeirah Heights"],
+    "JVC": [
+        "Jumeirah Village Circle (JVC)",
+        "Arjan",
+        "Tilal Al Ghaf",
+        "Majan",
+        "Serena",
+        "City of Arabia",
+        "Dubailand",
+        "Reem",
+        "The Villa"
+    ],
+    "Meydan: Sobha + Azizi Riviera": [
+        "Meydan City",
+        "Sobha Hartland",
+        "Mohammed Bin Rashid City",
+        "Remraam",
+        "DAMAC Hills",
+        "DAMAC Hills 2 (Akoya by DAMAC)",
+        "Al Barari",
+        "Falcon City of Wonders",
+        "Hadaeq Sheikh Mohammed Bin Rashid"
+    ],
+    "Dubai Design District + Al Jaddaf": [
+        "Al Jaddaf",
+        "Dubai Design District",
+        "Ras Al Khor",
+        "Al Warsan",
+        "Dubai Festival City"
+    ],
+    "JVT": [
+        "Jumeirah Village Triangle (JVT)",
+        "Jumeirah Park",
+        "The Springs",
+        "The Meadows",
+        "The Greens",
+        "The Views"
+    ],
+    "Creek Harbour": [
+        "Dubai Creek Harbour",
+        "Nad Al Sheba",
+        "Culture Village (Jaddaf Waterfront)",
+        "Wadi Al Shabak",
+        "Wadi Al Amardi"
+    ],
+    "Dubai Production City + Sport City + Motor City": [
+        "Dubai Production City (IMPZ)",
+        "Dubai Sports City",
+        "Motor City",
+        "Jumeirah Golf Estates",
+        "Dubai Science Park",
+        "Living Legends",
+        "Dubai Studio City"
+    ],
+    "Al Furjan + Discovery Garden": [
+        "Al Furjan",
+        "Discovery Gardens",
+        "The Gardens",
+        "Jebel Ali",
+        "Downtown Jebel Ali",
+        "Dubai South",
+        "Dubai Industrial City",
+        "Expo City"
+    ],
+    "Al Quoz": ["Al Quoz", "Al Khawaneej", "Al Awir", "Al Mizhar", "Mushraif", "Bukadra"],
+    "Al Barsha + Arjan": [
+        "Al Barsha",
+        "Arjan",
+        "Barsha Heights (Tecom)",
+        "Al Sufouh",
+        "Mirdif",
+        "Dubai Land Residence Complex",
+        "Green Community"
+    ]
+}

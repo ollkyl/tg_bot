@@ -18,6 +18,12 @@ from keyboards import (
 from states import Selection, ApartmentForm, BroadcastState
 from db import add_client, add_apartment, get_all_users
 
+period_translations = {
+    "monthly": "помесячно",
+    "daily": "посуточно",
+    "yearly": "от года",
+}
+
 
 def register_handlers(dp, bot, ADMIN_ID):
     @dp.message(Command("cancel"))
@@ -45,113 +51,6 @@ def register_handlers(dp, bot, ADMIN_ID):
                 continue
         await message.answer("Рассылка завершена.")
         await state.finish()
-
-    # @dp.message(Command("add_apartment"))
-    # async def cmd_add_apartment(message: types.Message, state: FSMContext):
-    #     if message.from_user.id != ADMIN_ID:
-    #         await message.answer("У вас нет прав для выполнения этой команды.")
-    #         return
-    #     await message.answer(
-    #         "Введите данные квартиры в следующем формате СТРОГО ЧЕРЕЗ @:\n\n"
-    #         "Агент @ Название @ Цена @ период @ доп. информация @ Район @ комнатность \n\n"
-    #         "Пример:\n"
-    #         " DBX_real_estate @ Сдается 2-bedroom в Business Bay!@ 180000@ от года@ депозит - 16.500 AED@ The Pad by Omniyat @ 2-комнатная \n\n"
-    #         "Для завершения отправьте команду /add_and_send."
-    #     )
-    #     await state.update_data(file_ids=[], apartment_data=None)
-    #     await state.set_state(ApartmentForm.waiting_for_data)
-
-    # @dp.message(StateFilter(ApartmentForm.waiting_for_data), ~Command(commands=["add_and_send"]))
-    # async def process_apartment_data(msg: types.Message, state: FSMContext):
-    #     current_data = await state.get_data()
-    #     file_ids = current_data.get("file_ids", [])
-    #     if msg.caption or msg.text:
-    #         if msg.caption:
-    #             data = [item.strip() for item in msg.caption.split("@")]
-    #         else:
-    #             data = [item.strip() for item in msg.text.split("@")]
-    #         await msg.answer(f"Вы ввели: {data}")
-    #         if len(data) < 6:
-    #             await msg.answer("Неверный формат. Убедитесь, что вы указали все поля.")
-    #             return
-    #         if not current_data.get("apartment_data"):
-    #             await state.update_data(apartment_data=data)
-    #             await msg.answer("Данные квартиры сохранены.")
-    #         else:
-    #             await msg.answer(
-    #                 "Данные квартиры уже введены. Продолжайте отправлять фото или завершите ввод командой /add_and_send."
-    #             )
-    #     if msg.photo or msg.video:
-    #         file_id = msg.photo[-1].file_id if msg.photo else msg.video.file_id
-    #         file_ids.append(file_id)
-    #         await state.update_data(file_ids=file_ids)
-    #         await msg.answer(
-    #             "Фото добавлено. Отправьте следующее, если нужно, или завершите командой /add_and_send."
-    #         )
-
-    # @dp.message(Command("add_and_send"), StateFilter(ApartmentForm.waiting_for_data))
-    # async def cmd_add_and_send(message: types.Message, state: FSMContext):
-    #     current_data = await state.get_data()
-    #     apartment_data = current_data.get("apartment_data")
-    #     file_ids = current_data.get("file_ids", [])
-    #     if not apartment_data:
-    #         await message.answer("Сначала введите данные квартиры с подписью.")
-    #         return
-    #     try:
-    #         agent, title, price_str, period, info, district = apartment_data[:6]
-    #         rooms = apartment_data[6] if len(apartment_data) > 6 else "Не указано"
-    #         price = int(price_str)
-    #     except Exception as e:
-    #         await message.answer("Ошибка при обработке данных квартиры.")
-    #         logging.error(f"Ошибка при обработке данных: {e}")
-    #         return
-    #     apartment_id, matching_clients = await add_apartment(
-    #         agent, title, price, rooms, district, period, info, file_ids
-    #     )
-    #     await message.answer(f"Квартира добавлена с ID {apartment_id}.")
-    #     print("matching_clients:", matching_clients)
-    #     if matching_clients:
-    #         apartment_message = (
-    #             f"🏠 {title}\n"
-    #             f"💰 Цена: {price} AED\n"
-    #             f"🛏️ Комнаты: {rooms}\n"
-    #             f"📍 Адрес: {district}\n"
-    #             f"⌛ Период: {period}\n"
-    #             f"ℹ️ Инфо: {info}\n"
-    #             f"Контакт: @{agent}"
-    #         )
-    #         await message.answer(f"Найдено совпадений по параметрам {len(matching_clients)}.")
-    #         sent_usernames = []
-    #         for user_id, user_name in matching_clients:
-    #             try:
-    #                 if user_id is None:
-    #                     print("user_id is None!")
-    #                 else:
-    #                     if user_name:
-    #                         sent_usernames.append(user_name)
-    #                     else:
-    #                         sent_usernames.append("Без имени")
-    #                     if file_ids:
-    #                         media = []
-    #                         for file_id in file_ids:
-    #                             if file_id.startswith("AgAC") or file_id.startswith("AgAD"):
-    #                                 media.append(types.InputMediaPhoto(media=file_id))
-    #                             else:
-    #                                 media.append(types.InputMediaVideo(media=file_id))
-    #                         if media:
-    #                             media[0].caption = apartment_message
-    #                         await bot.send_media_group(chat_id=user_id, media=media)
-    #                     else:
-    #                         await bot.send_photo(user_id, apartment_message)
-    #             except AiogramError as e:
-    #                 logging.error(f"Не удалось отправить сообщение пользователю {user_id}: {e}")
-    #         if sent_usernames:
-    #             await message.answer(
-    #                 f"Сообщения были отправлены пользователям: {', '.join(sent_usernames)}."
-    #             )
-    #     else:
-    #         await message.answer("Подходящих клиентов не найдено.")
-    #     await state.clear()
 
     @dp.message(Command("start"))
     async def send_welcome(message: types.Message, state: FSMContext):
@@ -196,9 +95,11 @@ def register_handlers(dp, bot, ADMIN_ID):
 
     @dp.callback_query(F.data == "button_rooms")
     async def choosing_count_of_rooms(callback: types.CallbackQuery, state: FSMContext):
+        data = await state.get_data()
+        selected_rooms = data.get("count_of_rooms", [])  # ✅ правильный ключ
         await callback.message.edit_text(
             "Выберите количество комнат:",
-            reply_markup=get_count_of_rooms_keyboard(rooms, selected_rooms=[]),
+            reply_markup=get_count_of_rooms_keyboard(rooms, selected_rooms=selected_rooms),
         )
         await state.set_state(Selection.choosing_count_of_rooms)
 
@@ -221,25 +122,45 @@ def register_handlers(dp, bot, ADMIN_ID):
     async def confirm_rooms(callback: types.CallbackQuery, state: FSMContext):
         await return_to_main_menu(callback, state)
 
+    period_options = ["monthly", "daily", "yearly"]
+
     @dp.callback_query(F.data == "button_period")
     async def choosing_period(callback: types.CallbackQuery, state: FSMContext):
+        data = await state.get_data()
+        selected_periods = data.get("periods", [])
         await callback.message.edit_text(
-            "Выберите срок аренды:", reply_markup=get_period_keyboard()
+            "Выберите срок аренды:",
+            reply_markup=get_period_keyboard(selected_periods=selected_periods),
         )
         await state.set_state(Selection.choosing_period)
 
-    @dp.callback_query(F.data.in_(["от года или помесячно", "помесячно"]))
+    @dp.callback_query(F.data.in_(period_options))
     async def confirm_period_choice(callback: types.CallbackQuery, state: FSMContext):
         period = callback.data
-        await state.update_data(period=period)
-        await callback.message.edit_text(f"Вы выбрали: {period}")
+        data = await state.get_data()
+        selected_periods = data.get("periods", [])
+
+        if period in selected_periods:
+            selected_periods.remove(period)
+        else:
+            selected_periods.append(period)
+
+        await state.update_data(periods=selected_periods)
+        await callback.message.edit_text(
+            "Выберите срок аренды:", reply_markup=get_period_keyboard(selected_periods)
+        )
+
+    @dp.callback_query(F.data == "period_done")
+    async def finish_period_selection(callback: types.CallbackQuery, state: FSMContext):
         await return_to_main_menu(callback, state)
 
     @dp.callback_query(F.data == "button_district")
     async def choosing_district(callback: types.CallbackQuery, state: FSMContext):
+        data = await state.get_data()
+        selected_districts = data.get("districts", [])  # ✅ читаем из FSM
         await callback.message.edit_text(
             "Выберите районы:",
-            reply_markup=get_district_keyboard(districts, selected_districts=[]),
+            reply_markup=get_district_keyboard(districts, selected_districts=selected_districts),
         )
         await state.set_state(Selection.choosing_district)
 
@@ -356,7 +277,13 @@ def register_handlers(dp, bot, ADMIN_ID):
         count_of_rooms = ", ".join(selected_rooms) if selected_rooms else "Не выбрано"
         min_price = data.get("min_price", "Не выбрано")
         max_price = data.get("max_price", "Не выбрано")
-        period = data.get("period", "Не выбрано")
+        periods = data.get("periods", "Не выбрано")
+        periods = data.get("periods", [])
+        if periods:
+            period = ", ".join(period_translations.get(p, p) for p in periods)
+        else:
+            period = "Не выбрано"
+
         if min_price != "Не выбрано":
             selected_text = (
                 f"Выбраные параметры:\n"
@@ -392,3 +319,110 @@ def register_handlers(dp, bot, ADMIN_ID):
                 print(f"Ошибка при редактировании сообщения: {e}")
                 raise
         await callback.message.edit_text("Выберите параметр:", reply_markup=inline_kb)
+
+    # @dp.message(Command("add_apartment"))
+    # async def cmd_add_apartment(message: types.Message, state: FSMContext):
+    #     if message.from_user.id != ADMIN_ID:
+    #         await message.answer("У вас нет прав для выполнения этой команды.")
+    #         return
+    #     await message.answer(
+    #         "Введите данные квартиры в следующем формате СТРОГО ЧЕРЕЗ @:\n\n"
+    #         "Агент @ Название @ Цена @ период @ доп. информация @ Район @ комнатность \n\n"
+    #         "Пример:\n"
+    #         " DBX_real_estate @ Сдается 2-bedroom в Business Bay!@ 180000@ от года@ депозит - 16.500 AED@ The Pad by Omniyat @ 2-комнатная \n\n"
+    #         "Для завершения отправьте команду /add_and_send."
+    #     )
+    #     await state.update_data(file_ids=[], apartment_data=None)
+    #     await state.set_state(ApartmentForm.waiting_for_data)
+
+    # @dp.message(StateFilter(ApartmentForm.waiting_for_data), ~Command(commands=["add_and_send"]))
+    # async def process_apartment_data(msg: types.Message, state: FSMContext):
+    #     current_data = await state.get_data()
+    #     file_ids = current_data.get("file_ids", [])
+    #     if msg.caption or msg.text:
+    #         if msg.caption:
+    #             data = [item.strip() for item in msg.caption.split("@")]
+    #         else:
+    #             data = [item.strip() for item in msg.text.split("@")]
+    #         await msg.answer(f"Вы ввели: {data}")
+    #         if len(data) < 6:
+    #             await msg.answer("Неверный формат. Убедитесь, что вы указали все поля.")
+    #             return
+    #         if not current_data.get("apartment_data"):
+    #             await state.update_data(apartment_data=data)
+    #             await msg.answer("Данные квартиры сохранены.")
+    #         else:
+    #             await msg.answer(
+    #                 "Данные квартиры уже введены. Продолжайте отправлять фото или завершите ввод командой /add_and_send."
+    #             )
+    #     if msg.photo or msg.video:
+    #         file_id = msg.photo[-1].file_id if msg.photo else msg.video.file_id
+    #         file_ids.append(file_id)
+    #         await state.update_data(file_ids=file_ids)
+    #         await msg.answer(
+    #             "Фото добавлено. Отправьте следующее, если нужно, или завершите командой /add_and_send."
+    #         )
+
+    # @dp.message(Command("add_and_send"), StateFilter(ApartmentForm.waiting_for_data))
+    # async def cmd_add_and_send(message: types.Message, state: FSMContext):
+    #     current_data = await state.get_data()
+    #     apartment_data = current_data.get("apartment_data")
+    #     file_ids = current_data.get("file_ids", [])
+    #     if not apartment_data:
+    #         await message.answer("Сначала введите данные квартиры с подписью.")
+    #         return
+    #     try:
+    #         agent, title, price_str, period, info, district = apartment_data[:6]
+    #         rooms = apartment_data[6] if len(apartment_data) > 6 else "Не указано"
+    #         price = int(price_str)
+    #     except Exception as e:
+    #         await message.answer("Ошибка при обработке данных квартиры.")
+    #         logging.error(f"Ошибка при обработке данных: {e}")
+    #         return
+    #     apartment_id, matching_clients = await add_apartment(
+    #         agent, title, price, rooms, district, period, info, file_ids
+    #     )
+    #     await message.answer(f"Квартира добавлена с ID {apartment_id}.")
+    #     print("matching_clients:", matching_clients)
+    #     if matching_clients:
+    #         apartment_message = (
+    #             f"🏠 {title}\n"
+    #             f"💰 Цена: {price} AED\n"
+    #             f"🛏️ Комнаты: {rooms}\n"
+    #             f"📍 Адрес: {district}\n"
+    #             f"⌛ Период: {period}\n"
+    #             f"ℹ️ Инфо: {info}\n"
+    #             f"Контакт: @{agent}"
+    #         )
+    #         await message.answer(f"Найдено совпадений по параметрам {len(matching_clients)}.")
+    #         sent_usernames = []
+    #         for user_id, user_name in matching_clients:
+    #             try:
+    #                 if user_id is None:
+    #                     print("user_id is None!")
+    #                 else:
+    #                     if user_name:
+    #                         sent_usernames.append(user_name)
+    #                     else:
+    #                         sent_usernames.append("Без имени")
+    #                     if file_ids:
+    #                         media = []
+    #                         for file_id in file_ids:
+    #                             if file_id.startswith("AgAC") or file_id.startswith("AgAD"):
+    #                                 media.append(types.InputMediaPhoto(media=file_id))
+    #                             else:
+    #                                 media.append(types.InputMediaVideo(media=file_id))
+    #                         if media:
+    #                             media[0].caption = apartment_message
+    #                         await bot.send_media_group(chat_id=user_id, media=media)
+    #                     else:
+    #                         await bot.send_photo(user_id, apartment_message)
+    #             except AiogramError as e:
+    #                 logging.error(f"Не удалось отправить сообщение пользователю {user_id}: {e}")
+    #         if sent_usernames:
+    #             await message.answer(
+    #                 f"Сообщения были отправлены пользователям: {', '.join(sent_usernames)}."
+    #             )
+    #     else:
+    #         await message.answer("Подходящих клиентов не найдено.")
+    #     await state.clear()
