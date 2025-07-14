@@ -11,10 +11,5 @@ class Selection(StatesGroup):
     user_id = State()
 
 
-class ApartmentForm(StatesGroup):
-    waiting_for_data = State()
-    apartment_data = State()
-
-
 class BroadcastState(StatesGroup):
     waiting_for_message = State()
