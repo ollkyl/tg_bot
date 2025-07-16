@@ -4,7 +4,7 @@ import os
 from datetime import datetime, timedelta
 import logging
 from db import add_apartment, async_session, Apartment
-from sending_messages import send_apartment_notification
+from parcer.sending_messages import send_apartment_notification
 from dotenv import dotenv_values
 from sqlalchemy.sql import select, delete
 import json
@@ -122,10 +122,8 @@ async def cleanup_old_ids_and_db():
             content = f.read().strip()
             last_cleanup = datetime.fromtimestamp(float(content)) if content else current_time
         if (current_time - last_cleanup).total_seconds() >= CLEANUP_INTERVAL_HOURS * 3600:
-            # Очистка id_list.txt
             with open(ID_LIST_FILE, "w") as f:
                 f.write("")
-            # Очистка старых записей в БД
             async with async_session() as db_session:
                 async with db_session.begin():
                     await db_session.execute(
@@ -134,14 +132,13 @@ async def cleanup_old_ids_and_db():
                         )
                     )
                     await db_session.commit()
-            # Обновление времени очистки
             with open(LAST_CLEANUP_FILE, "w") as f:
                 f.write(str(current_time.timestamp()))
             logging.info("Очищены id_list.txt и старые записи в БД")
 
 
 async def fetch_hits(session, page):
-    start_time = datetime.now() - timedelta(minutes=12)  # Проверяем за последние 12 минут
+    start_time = datetime.now() - timedelta(minutes=12)
     start_timestamp = int(start_time.timestamp())
     data = {
         "requests": [
@@ -201,12 +198,13 @@ async def process_new_ads():
                     for hit in new_hits:
                         external_id = hit["externalID"]
                         object_id = hit.get("objectID")
-                        created_at = datetime.fromtimestamp(hit.get("createdAt", 0)).strlen("%H:%M")
+                        created_at = datetime.fromtimestamp(hit.get("createdAt", 0)).strftime(
+                            "%H:%M"
+                        )  # Исправлено: strlen → strftime
                         logging.info(
                             f"Обработка: externalID={external_id}, objectID={object_id}, createdAt={created_at}"
                         )
 
-                        # Проверка уникальности в БД
                         existing_apartment = await db_session.execute(
                             select(Apartment).where(Apartment.object_id == object_id)
                         )
@@ -223,7 +221,12 @@ async def process_new_ads():
                                 owner = detail_hit.get("phoneNumber", {}).get("mobile", "Unknown")
                             name = detail_hit.get("title", "No title")
                             price = detail_hit.get("price", 0.0)
-                            rooms = str(detail_hit.get("rooms", "Studio"))
+
+                            rooms_raw = detail_hit.get("rooms")
+                            if rooms_raw in [None, 0]:
+                                rooms = "Студия"
+                            else:
+                                rooms = str(rooms_raw)
                             location_data = detail_hit.get("location", [])
                             district_area = next(
                                 (
@@ -234,19 +237,23 @@ async def process_new_ads():
                                 "Unknown",
                             )
                             district = find_district(district_area)
-                            period = detail_hit.get("rentFrequency", "yearly")
+                            raw_period = detail_hit.get("rentFrequency", "yearly")
+                            period_map = {
+                                "yearly": "в год",
+                                "monthly": "в месяц",
+                                "weekly": "в неделю",
+                                "daily": "в день",
+                            }
+                            period = period_map.get(raw_period, raw_period)
+                            # Пересчёт цены в месяц
+                            if raw_period == "yearly":
+                                price = round(price / 12)
+                            elif raw_period == "weekly":
+                                price = round(price * 4.345)  # недель → месяц
+                            elif raw_period == "daily":
+                                price = round(price * 30)
                             info = await get_info(session, external_id)
-                            if info == "No description found":
-                                keywords = (
-                                    ", ".join(detail_hit.get("keywords", [])[:5]) or "Unknown"
-                                )
-                                amenities = (
-                                    ", ".join(detail_hit.get("amenities", [])[:3]) or "Unknown"
-                                )
-                                furnishing = detail_hit.get("furnishingStatus", "Unknown")
-                                area = detail_hit.get("area", "Unknown")
-                                baths = detail_hit.get("baths", "Unknown")
-                                info = f"{rooms}-bedroom apartment, {baths} baths, {area} sqm, {furnishing}. Features: {keywords}. Amenities: {amenities}."
+
                             logging.info(f"Описание для {external_id}: {info}")
                             cover_id = detail_hit.get("coverPhoto", {}).get("externalID", "")
                             photo_ids = [
@@ -287,11 +294,11 @@ async def process_new_ads():
         logging.info(f"Добавлено новых ID в id_list.txt: {len(new_hits)}")
 
 
-async def main():
+async def main_parser():
     while True:
         await process_new_ads()
-        await asyncio.sleep(CHECK_INTERVAL_MINUTES * 60)  # 10 минут
+        await asyncio.sleep(CHECK_INTERVAL_MINUTES * 60)
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(main_parser())

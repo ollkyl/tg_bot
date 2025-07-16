@@ -22,7 +22,7 @@ env_values = dotenv_values(".env")
 
 DB_USER = env_values.get("DB_USER")
 DB_PASS = env_values.get("DB_PASS")
-DB_HOST = env_values.get("DB_HOST", "localhost")
+DB_HOST = env_values.get("DB_HOST")
 DB_PORT = env_values.get("DB_PORT")
 DB_NAME = env_values.get("DB_NAME")
 

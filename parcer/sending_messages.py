@@ -7,7 +7,7 @@ from db import async_session, Apartment, find_matching_clients
 from dotenv import dotenv_values
 from sqlalchemy.sql import select
 
-# Настройка логирования (только ошибки и ключевые события)
+# Настройка логирования
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 # Инициализация бота
@@ -73,11 +73,11 @@ async def send_apartment_notification(apartment_id):
 
         message = (
             f"🏠 {apt.name}\n"
-            f"💰 Цена: {apt.price} AED\n"
+            f"💰 Цена в месяц: {apt.price} AED\n"
             f"🛏️ Комнаты: {apt.rooms}\n"
             f"📍 Район: {apt.district}\n"
             f"⌛ Период: {apt.period}\n"
-            f"ℹ️ Инфо: {apt.info or 'Нет описания'}\n"
+            f"ℹ️ Удобства: {apt.info or 'Нет удобств'}\n"
             f"🔗 <a href='{apt.link}'>Ссылка на объявление</a>\n"
             f"📞 {apt.owner.replace(' ', '_')}"
         )

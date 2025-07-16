@@ -3,7 +3,7 @@ from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.exceptions import AiogramError
 
-from keyboards import (
+from bot.keyboards import (
     inline_kb,
     main_menu,
     get_min_price_keyboard,
@@ -15,8 +15,8 @@ from keyboards import (
     districts,
     finish_messages,
 )
-from states import Selection, ApartmentForm, BroadcastState
-from db import add_client, add_apartment, get_all_users
+from bot.states import Selection, BroadcastState
+from db import add_client, get_all_users
 
 period_translations = {
     "monthly": "помесячно",

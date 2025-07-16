@@ -1,30 +1,24 @@
-from aiogram import Bot, Dispatcher
 import asyncio
-
+import logging
+from aiogram import Bot, Dispatcher
+from aiogram.fsm.storage.memory import MemoryStorage
+from bot.handlers import register_handlers
+from parcer.parcer import process_new_ads  # Импортируем функцию из parcer.py
 from dotenv import dotenv_values
-from handlers import register_handlers
-from db import engine, Base
 
+logging.basicConfig(level=logging.INFO, filename="app.log")
+logger = logging.getLogger(__name__)
 
 env_values = dotenv_values(".env")
-
-API_TOKEN = env_values.get("API_TOKEN")
-ADMIN_ID = int(env_values.get("ADMIN_ID") or 0)
-
-
-bot = Bot(token=API_TOKEN)
-dp = Dispatcher()
-
-
-async def init_db():
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+API_TOKEN = env_values["API_TOKEN"]
+ADMIN_ID = int(env_values["ADMIN_ID"])
 
 
 async def main():
-    await init_db()
+    bot = Bot(token=API_TOKEN)
+    dp = Dispatcher(storage=MemoryStorage())
     register_handlers(dp, bot, ADMIN_ID)
-    await dp.start_polling(bot)
+    await asyncio.gather(dp.start_polling(bot), process_new_ads())  # Запускаем бот и парсер
 
 
 if __name__ == "__main__":
