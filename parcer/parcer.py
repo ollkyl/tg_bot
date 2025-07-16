@@ -31,6 +31,34 @@ CLEANUP_INTERVAL_HOURS = 12
 CHECK_INTERVAL_MINUTES = 10
 DB_CLEANUP_DAYS = 7
 
+
+AMENITIES_TRANSLATION = {
+    "Balcony": "Балкон",
+    "Central A/C": "Центральный кондиционер",
+    "Built in Wardrobes": "Встроенные шкафы",
+    "Kitchen Appliances": "Кухонная техника",
+    "View of Water": "Вид на воду",
+    "Private Garden": "Частный сад",
+    "Private Pool": "Частный бассейн",
+    "Security": "Охрана",
+    "Parking": "Парковка",
+    # Добавь переводы для остальных удобств, например:
+    "Electricity Backup": "Резервное электропитание",
+    "Waste Disposal": "Утилизация отходов",
+    "Maintenance Staff": "Обслуживающий персонал",
+    "Security Staff": "Служба безопасности",
+    "CCTV Security": "Камеры видеонаблюдения",
+    "Intercom": "Домофон",
+    "Reception/Waiting Room": "Ресепшен/Зона ожидания",
+    "Facilities for Disabled": "Удобства для инвалидов",
+    "Balcony or Terrace": "Балкон или терраса",
+    "Lobby in Building": "Лобби в здании",
+    "Double Glazed Windows": "Двойные стеклопакеты",
+    "Central Heating": "Центральное отопление",
+    "24 Hours Concierge": "Круглосуточный консьерж",
+    "Cleaning Services": "Услуги уборки",
+    "Satellite/Cable TV": "Спутниковое/кабельное ТВ",
+}
 # Заголовки
 headers = {
     "X-Algolia-API-Key": ALGOLIA_API_KEY,
@@ -60,28 +88,6 @@ existing_ids = set()
 if os.path.exists(ID_LIST_FILE):
     with open(ID_LIST_FILE, "r") as f:
         existing_ids = set(line.strip() for line in f if line.strip())
-
-
-async def get_info(session, external_id):
-    url = f"https://www.bayut.com/property/details-{external_id}.html"
-    try:
-        async with session.get(url, headers=headers) as response:
-            if response.status == 200:
-                html = await response.text()
-                soup = BeautifulSoup(html, "html.parser")
-                desc_block = soup.find("div", class_="_0a5f69b8")
-                if desc_block:
-                    description = re.sub(r"\s+", " ", desc_block.get_text(strip=True)).strip()[:500]
-                    return description
-                logging.warning(f"Не найдено описание для external_id={external_id}")
-                return "No description found"
-            logging.error(
-                f"Ошибка загрузки HTML для external_id={external_id}: статус {response.status}"
-            )
-            return "No description found"
-    except Exception as e:
-        logging.error(f"Ошибка при получении описания для external_id={external_id}: {e}")
-        return "No description"
 
 
 async def get_contact_phone_from_html(session, external_id):
@@ -252,9 +258,19 @@ async def process_new_ads():
                                 price = round(price * 4.345)  # недель → месяц
                             elif raw_period == "daily":
                                 price = round(price * 30)
-                            info = await get_info(session, external_id)
 
-                            logging.info(f"Описание для {external_id}: {info}")
+                            amenities = detail_hit.get("amenities", [])
+                            translated_amenities = [
+                                AMENITIES_TRANSLATION.get(amenity, amenity) for amenity in amenities
+                            ]
+                            info = (
+                                ", ".join(translated_amenities)
+                                if translated_amenities
+                                else "Нет удобств"
+                            )
+
+                            logging.info(f"Удобства для {external_id}: {info}")
+
                             cover_id = detail_hit.get("coverPhoto", {}).get("externalID", "")
                             photo_ids = [
                                 str(photo_id) for photo_id in detail_hit.get("photoIDs", [])
