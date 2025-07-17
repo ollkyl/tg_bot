@@ -2,7 +2,7 @@ __pycache__/
 *.pyc
 *.pyo
 *.log
-.env
+
 .git/
 .idea/
 .vscode/

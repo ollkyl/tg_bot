@@ -6,6 +6,8 @@ from bot.handlers import register_handlers
 from parser.parser import main_parser
 from dotenv import dotenv_values
 import asyncpg
+from sqlalchemy.ext.asyncio import create_async_engine
+from db import Base, DATABASE_URL
 
 # Загрузка переменных из .env
 env_values = dotenv_values(".env")
@@ -34,9 +36,16 @@ async def wait_for_postgres():
             await asyncio.sleep(2)
 
 
-# Основной запуск бота
+async def init_db():
+    engine = create_async_engine(DATABASE_URL, echo=True)
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)  # Создает все таблицы
+    await engine.dispose()
+
+
 async def main():
-    await wait_for_postgres()
+    await wait_for_postgres()  # Ожидание доступности PostgreSQL
+    await init_db()  # Инициализация таблиц
     bot = Bot(token=API_TOKEN)
     dp = Dispatcher(storage=MemoryStorage())
     register_handlers(dp, bot, ADMIN_ID)
