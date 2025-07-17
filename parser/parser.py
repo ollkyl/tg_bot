@@ -4,21 +4,14 @@ import os
 from datetime import datetime, timedelta
 import logging
 from db import add_apartment, async_session, Apartment
-from parcer.sending_messages import send_apartment_notification
+from parser.sending_messages import send_apartment_notification
 from dotenv import dotenv_values
 from sqlalchemy.sql import select, delete
 import json
 from bs4 import BeautifulSoup
 import re
 
-# Настройка логирования
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    handlers=[logging.FileHandler("app.log"), logging.StreamHandler()],
-)
 
-# Загрузка переменных окружения
 env_values = dotenv_values(".env")
 ALGOLIA_BASE_URL = env_values.get("ALGOLIA_BASE_URL")
 ALGOLIA_API_KEY = env_values.get("ALGOLIA_API_KEY")
@@ -31,35 +24,73 @@ CLEANUP_INTERVAL_HOURS = 12
 CHECK_INTERVAL_MINUTES = 10
 DB_CLEANUP_DAYS = 7
 
-
 AMENITIES_TRANSLATION = {
     "Balcony": "Балкон",
+    "Balcony or Terrace": "Балкон или терраса",
     "Central A/C": "Центральный кондиционер",
+    "Centrally Air-Conditioned": "Центральный кондиционер",
+    "Central Heating": "Центральное отопление",
     "Built in Wardrobes": "Встроенные шкафы",
     "Kitchen Appliances": "Кухонная техника",
     "View of Water": "Вид на воду",
     "Private Garden": "Частный сад",
     "Private Pool": "Частный бассейн",
     "Security": "Охрана",
-    "Parking": "Парковка",
-    # Добавь переводы для остальных удобств, например:
-    "Electricity Backup": "Резервное электропитание",
-    "Waste Disposal": "Утилизация отходов",
-    "Maintenance Staff": "Обслуживающий персонал",
     "Security Staff": "Служба безопасности",
     "CCTV Security": "Камеры видеонаблюдения",
     "Intercom": "Домофон",
     "Reception/Waiting Room": "Ресепшен/Зона ожидания",
     "Facilities for Disabled": "Удобства для инвалидов",
-    "Balcony or Terrace": "Балкон или терраса",
-    "Lobby in Building": "Лобби в здании",
     "Double Glazed Windows": "Двойные стеклопакеты",
-    "Central Heating": "Центральное отопление",
     "24 Hours Concierge": "Круглосуточный консьерж",
     "Cleaning Services": "Услуги уборки",
+    "Maintenance Staff": "Обслуживающий персонал",
+    "Waste Disposal": "Утилизация отходов",
+    "Electricity Backup": "Резервное электропитание",
     "Satellite/Cable TV": "Спутниковое/кабельное ТВ",
+    "Broadband Internet": "Широкополосный интернет",
+    "Parking": "Парковка",
+    "Parking Spaces": "Парковочные места",
+    "Service Elevators": "Служебные лифты",
+    "Elevators in Building": "Лифты в здании",
+    "Lobby in Building": "Лобби в здании",
+    "Storage Areas": "Кладовые помещения",
+    "Study Room": "Кабинет / Учебная комната",
+    "Prayer Room": "Молельная комната",
+    "First Aid Medical Center": "Медпункт первой помощи",
+    "Gym or Health Club": "Тренажёрный зал / Фитнес-центр",
+    "Sauna": "Сауна",
+    "Steam Room": "Паровая баня",
+    "Jacuzzi": "Джакузи",
+    "Swimming Pool": "Бассейн",
+    "Day Care Center": "Детский сад",
+    "Kids Play Area": "Детская игровая площадка",
+    "Lawn or Garden": "Газон / Сад",
+    "Barbeque Area": "Зона для барбекю",
+    "Cafeteria or Canteen": "Кафетерий / Столовая",
+    "Conference Room": "Конференц-зал",
+    "ATM Facility": "Банкомат",
+    "Business Center": "Бизнес-центр",
+    "Laundry Room": "Прачечная",
+    "Laundry Facility": "Прачечная",
+    "Shared Kitchen": "Общая кухня",
+    "Furnished": "Меблированная",
+    "Maids Room": "Комната для прислуги",
+    # Дополнительные поля из описания (не удобства, но могут встречаться)
+    "Completion Year": "Год завершения строительства",
+    "View": "Вид",
+    "Floor": "Этаж",
+    "Nearby Schools": "Рядом школы",
+    "Nearby Hospitals": "Рядом больницы",
+    "Nearby Shopping Malls": "Рядом торговые центры",
+    "Distance From Airport (kms)": "Расстояние до аэропорта (км)",
+    "Nearby Public Transport": "Общественный транспорт рядом",
+    "Other Nearby Places": "Другие близлежащие места",
+    "Number of Bathrooms": "Количество ванных комнат",
+    "Total Floors": "Общее количество этажей",
 }
-# Заголовки
+
+
 headers = {
     "X-Algolia-API-Key": ALGOLIA_API_KEY,
     "X-Algolia-Application-Id": ALGOLIA_APP_ID,
@@ -72,9 +103,9 @@ headers = {
 if BAYUT_COOKIE:
     headers["Cookie"] = BAYUT_COOKIE
 
-# Загрузка district_mapping
+
 try:
-    with open("districts.json", "r", encoding="utf-8") as f:
+    with open("parser/districts.json", "r", encoding="utf-8") as f:
         district_mapping = json.load(f)
 except FileNotFoundError:
     logging.error("Файл districts.json не найден.")
@@ -206,7 +237,7 @@ async def process_new_ads():
                         object_id = hit.get("objectID")
                         created_at = datetime.fromtimestamp(hit.get("createdAt", 0)).strftime(
                             "%H:%M"
-                        )  # Исправлено: strlen → strftime
+                        )
                         logging.info(
                             f"Обработка: externalID={external_id}, objectID={object_id}, createdAt={created_at}"
                         )
@@ -230,7 +261,7 @@ async def process_new_ads():
 
                             rooms_raw = detail_hit.get("rooms")
                             if rooms_raw in [None, 0]:
-                                rooms = "Студия"
+                                rooms = "100"
                             else:
                                 rooms = str(rooms_raw)
                             location_data = detail_hit.get("location", [])
@@ -244,13 +275,7 @@ async def process_new_ads():
                             )
                             district = find_district(district_area)
                             raw_period = detail_hit.get("rentFrequency", "yearly")
-                            period_map = {
-                                "yearly": "в год",
-                                "monthly": "в месяц",
-                                "weekly": "в неделю",
-                                "daily": "в день",
-                            }
-                            period = period_map.get(raw_period, raw_period)
+                            period = raw_period
                             # Пересчёт цены в месяц
                             if raw_period == "yearly":
                                 price = round(price / 12)
@@ -258,6 +283,14 @@ async def process_new_ads():
                                 price = round(price * 4.345)  # недель → месяц
                             elif raw_period == "daily":
                                 price = round(price * 30)
+
+                            furnishing_status = detail_hit.get("furnishingStatus")
+                            if furnishing_status == "furnished":
+                                furnishing = True
+                            elif furnishing_status == "unfurnished":
+                                furnishing = False
+                            else:
+                                furnishing = None
 
                             amenities = detail_hit.get("amenities", [])
                             translated_amenities = [
@@ -286,6 +319,7 @@ async def process_new_ads():
                                 rooms,
                                 district,
                                 period,
+                                furnishing,
                                 info,
                                 photo_ids,
                                 object_id,

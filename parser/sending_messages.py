@@ -7,8 +7,6 @@ from db import async_session, Apartment, find_matching_clients
 from dotenv import dotenv_values
 from sqlalchemy.sql import select
 
-# Настройка логирования
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 # Инициализация бота
 env_values = dotenv_values(".env")
@@ -71,13 +69,20 @@ async def send_apartment_notification(apartment_id):
             logging.error(f"[NOTIFY] Квартира с ID {apartment_id} не найдена")
             return
 
+        furnishing_translations = {
+            "furnished": "Меблированная",
+            "unfurnished": "Немеблированная",
+        }
+        furnishing = furnishing_translations.get(apt.furnishing, apt.furnishing or "Не указано")
+
         message = (
             f"🏠 {apt.name}\n"
             f"💰 Цена в месяц: {apt.price} AED\n"
             f"🛏️ Комнаты: {apt.rooms}\n"
             f"📍 Район: {apt.district}\n"
             f"⌛ Период: {apt.period}\n"
-            f"ℹ️ Удобства: {apt.info or 'Нет удобств'}\n"
+            f"🪑 {furnishing}\n"
+            f"ℹ️ Удобства: {apt.info or 'Не указаны удобства'}\n"
             f"🔗 <a href='{apt.link}'>Ссылка на объявление</a>\n"
             f"📞 {apt.owner.replace(' ', '_')}"
         )

@@ -2,7 +2,6 @@ from aiogram import F, types
 from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.exceptions import AiogramError
-
 from bot.keyboards import (
     inline_kb,
     main_menu,
@@ -11,6 +10,7 @@ from bot.keyboards import (
     get_count_of_rooms_keyboard,
     get_period_keyboard,
     get_district_keyboard,
+    get_furnishing_keyboard,
     rooms,
     districts,
     finish_messages,
@@ -22,6 +22,20 @@ period_translations = {
     "monthly": "помесячно",
     "daily": "посуточно",
     "yearly": "от года",
+}
+
+furnishing_translations = {
+    "furnished": "Меблированная",
+    "unfurnished": "Немеблированная",
+}
+
+
+rooms_translation = {
+    "студия": "100",
+    "1-комнатная": "1",
+    "2-комнатная": "2",
+    "3-комнатная": "3",
+    "4-комнатная": "4",
 }
 
 
@@ -96,7 +110,7 @@ def register_handlers(dp, bot, ADMIN_ID):
     @dp.callback_query(F.data == "button_rooms")
     async def choosing_count_of_rooms(callback: types.CallbackQuery, state: FSMContext):
         data = await state.get_data()
-        selected_rooms = data.get("count_of_rooms", [])  # ✅ правильный ключ
+        selected_rooms = data.get("count_of_rooms", [])
         await callback.message.edit_text(
             "Выберите количество комнат:",
             reply_markup=get_count_of_rooms_keyboard(rooms, selected_rooms=selected_rooms),
@@ -139,12 +153,10 @@ def register_handlers(dp, bot, ADMIN_ID):
         period = callback.data
         data = await state.get_data()
         selected_periods = data.get("periods", [])
-
         if period in selected_periods:
             selected_periods.remove(period)
         else:
             selected_periods.append(period)
-
         await state.update_data(periods=selected_periods)
         await callback.message.edit_text(
             "Выберите срок аренды:", reply_markup=get_period_keyboard(selected_periods)
@@ -157,7 +169,7 @@ def register_handlers(dp, bot, ADMIN_ID):
     @dp.callback_query(F.data == "button_district")
     async def choosing_district(callback: types.CallbackQuery, state: FSMContext):
         data = await state.get_data()
-        selected_districts = data.get("districts", [])  # ✅ читаем из FSM
+        selected_districts = data.get("districts", [])
         await callback.message.edit_text(
             "Выберите районы:",
             reply_markup=get_district_keyboard(districts, selected_districts=selected_districts),
@@ -183,6 +195,35 @@ def register_handlers(dp, bot, ADMIN_ID):
     async def confirm_districts(callback: types.CallbackQuery, state: FSMContext):
         await return_to_main_menu(callback, state)
 
+    @dp.callback_query(F.data == "button_furnishing")
+    async def choosing_furnishing(callback: types.CallbackQuery, state: FSMContext):
+        data = await state.get_data()
+        selected_furnishing = data.get("furnishing", [])
+        await callback.message.edit_text(
+            "Выберите тип меблировки:",
+            reply_markup=get_furnishing_keyboard(selected_furnishing=selected_furnishing),
+        )
+        await state.set_state(Selection.choosing_furnishing)
+
+    @dp.callback_query(F.data.in_(["furnished", "unfurnished"]))
+    async def confirm_furnishing_choice(callback: types.CallbackQuery, state: FSMContext):
+        furnishing = callback.data
+        data = await state.get_data()
+        selected_furnishing = data.get("furnishing", [])
+        if furnishing in selected_furnishing:
+            selected_furnishing.remove(furnishing)
+        else:
+            selected_furnishing.append(furnishing)
+        await state.update_data(furnishing=selected_furnishing)
+        await callback.message.edit_text(
+            "Выберите тип меблировки:",
+            reply_markup=get_furnishing_keyboard(selected_furnishing),
+        )
+
+    @dp.callback_query(F.data == "furnishing_done")
+    async def finish_furnishing_selection(callback: types.CallbackQuery, state: FSMContext):
+        await return_to_main_menu(callback, state)
+
     @dp.callback_query(F.data == "back")
     async def go_back(callback: types.CallbackQuery, state: FSMContext):
         await callback.message.edit_text("Выберите параметры:", reply_markup=inline_kb)
@@ -200,7 +241,8 @@ def register_handlers(dp, bot, ADMIN_ID):
             "<code>🏠 Районы:</code> <b>Не выбрано</b>\n"
             "<code>💰 Диапазон цены:</code> <b>Не выбрано</b>\n"
             "<code>🛏 Комнаты:</code> <b>Не выбрано</b>\n"
-            "<code>📆 Срок аренды:</code> <b>Не выбрано</b>"
+            "<code>📆 Срок аренды:</code> <b>Не выбрано</b>\n"
+            "<code>🪑 Меблировка:</code> <b>Не выбрано</b>"
         )
         message_id = data.get("selected_message_id")
         await state.clear()
@@ -211,7 +253,6 @@ def register_handlers(dp, bot, ADMIN_ID):
                 message_id=message_id,
                 parse_mode="HTML",
             )
-            await state.clear()
             await state.update_data(
                 user_id=user_id,
                 user_name=user_name,
@@ -224,12 +265,23 @@ def register_handlers(dp, bot, ADMIN_ID):
     async def save_data(callback: types.CallbackQuery, state: FSMContext):
         data = await state.get_data()
         districts_selected = data.get("districts", [])
-        district = ", ".join(districts_selected) if districts_selected else "Не выбрано"
+        district = ", ".join(districts_selected) if districts_selected else None
         selected_rooms = data.get("count_of_rooms", [])
-        count_of_rooms = ", ".join(selected_rooms) if selected_rooms else "Не выбрано"
+        count_of_rooms = (
+            ", ".join(rooms_translation.get(room, room) for room in selected_rooms)
+            if selected_rooms
+            else None
+        )
         min_price = data.get("min_price", 0)
         max_price = data.get("max_price", 1000000)
-        period = data.get("period", "Не выбрано")
+        periods = data.get("periods", [])
+        period = ", ".join(periods) if periods else None  # Преобразуем список в строку
+        furnishing_list = data.get("furnishing", [])
+        furnishing = None
+        if len(furnishing_list) == 1:
+            furnishing = (
+                furnishing_list[0] == "furnished"
+            )  # True если 'furnished', False если 'unfurnished'
         user_id = data.get("user_id")
         user_name = data.get("user_name")
         save_count = data.get("save_count", 0)
@@ -241,13 +293,11 @@ def register_handlers(dp, bot, ADMIN_ID):
             district,
             period,
             user_name,
+            furnishing,
         )
         await callback.answer("Данные сохранены!")
         save_count += 1
-        if save_count == 1:
-            message_index = 0
-        else:
-            message_index = 1 + ((save_count - 2) % 5)
+        message_index = 0 if save_count == 1 else 1 + ((save_count - 2) % 5)
         finish_message_id = data.get("finish_message_id")
         finish_message = finish_messages[message_index]
         try:
@@ -277,29 +327,24 @@ def register_handlers(dp, bot, ADMIN_ID):
         count_of_rooms = ", ".join(selected_rooms) if selected_rooms else "Не выбрано"
         min_price = data.get("min_price", "Не выбрано")
         max_price = data.get("max_price", "Не выбрано")
-        periods = data.get("periods", "Не выбрано")
         periods = data.get("periods", [])
-        if periods:
-            period = ", ".join(period_translations.get(p, p) for p in periods)
-        else:
-            period = "Не выбрано"
-
-        if min_price != "Не выбрано":
-            selected_text = (
-                f"Выбраные параметры:\n"
-                f"<code>🏠 Районы:</code> <b>{district}</b>\n"
-                f"<code>💰 Диапазон цены:</code> <b>{min_price} </b> - <b>{max_price} AED в месяц</b>\n"
-                f"<code>🛏 Комнаты:</code> <b>{count_of_rooms}</b>\n"
-                f"<code>📆 Срок аренды:</code> <b>{period}</b>"
-            )
-        else:
-            selected_text = (
-                f"Выбраные параметры:\n"
-                f"<code>🏠 Районы:</code> <b>{district}</b>\n"
-                f"<code>💰 Диапазон цены:</code> <b>{min_price}</b>\n"
-                f"<code>🛏 Комнаты:</code> <b>{count_of_rooms}</b>\n"
-                f"<code>📆 Срок аренды:</code> <b>{period}</b>"
-            )
+        period = (
+            ", ".join(period_translations.get(p, p) for p in periods) if periods else "Не выбрано"
+        )
+        furnishing = data.get("furnishing", [])
+        furnishing_text = (
+            ", ".join(furnishing_translations.get(f, f) for f in furnishing)
+            if furnishing
+            else "Не выбрано"
+        )
+        selected_text = (
+            f"Выбраные параметры:\n"
+            f"<code>🏠 Районы:</code> <b>{district}</b>\n"
+            f"<code>💰 Диапазон цены:</code> <b>{min_price} - {max_price} AED в месяц</b>\n"
+            f"<code>🛏 Комнаты:</code> <b>{count_of_rooms}</b>\n"
+            f"<code>📆 Срок аренды:</code> <b>{period}</b>\n"
+            f"<code>🪑 Меблировка:</code> <b>{furnishing_text}</b>"
+        )
         message_id = data.get("selected_message_id")
         try:
             if message_id:

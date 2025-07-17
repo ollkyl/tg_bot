@@ -44,7 +44,10 @@ inline_kb = InlineKeyboardMarkup(
         [InlineKeyboardButton(text="Цена", callback_data="button_price")],
         [InlineKeyboardButton(text="Комнаты", callback_data="button_rooms")],
         [InlineKeyboardButton(text="Срок аренды", callback_data="button_period")],
-        [InlineKeyboardButton(text="Сохранить выбор", callback_data="button_save")],
+        [
+            InlineKeyboardButton(text="Меблировка", callback_data="button_furnishing")
+        ],  # Новая кнопка
+        [InlineKeyboardButton(text="❕Сохранить выбор❕", callback_data="button_save")],
         [InlineKeyboardButton(text="Отчистить всё", callback_data="button_delete")],
     ]
 )
@@ -110,4 +113,21 @@ def get_district_keyboard(districts, selected_districts):
         buttons.append([InlineKeyboardButton(text=text, callback_data=district)])
     buttons.append([InlineKeyboardButton(text="Готово", callback_data="district_done")])
     buttons.append([InlineKeyboardButton(text="Назад", callback_data="back")])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
+def get_furnishing_keyboard(selected_furnishing):
+    options = [
+        ("Меблированная", "furnished"),
+        ("Немеблированная", "unfurnished"),
+    ]
+
+    buttons = []
+    for label, value in options:
+        text = f"✅ {label}" if value in selected_furnishing else label
+        buttons.append([InlineKeyboardButton(text=text, callback_data=value)])
+
+    buttons.append([InlineKeyboardButton(text="Готово", callback_data="furnishing_done")])
+    buttons.append([InlineKeyboardButton(text="Назад", callback_data="back")])
+
     return InlineKeyboardMarkup(inline_keyboard=buttons)
