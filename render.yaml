@@ -10,3 +10,4 @@ services:
         fromDatabase:
           name: tg-bot-db
           property: connectionString
+    port: 10000  # <- добавь эту строку
