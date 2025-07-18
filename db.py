@@ -13,14 +13,11 @@ from sqlalchemy import (
     delete,
     select,
 )
-from dotenv import dotenv_values
 import logging
+import os
 
 logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
 
-env_values = dotenv_values(".env")
-
-import os
 
 DB_USER = os.getenv("DB_USER")
 DB_PASS = os.getenv("DB_PASS")

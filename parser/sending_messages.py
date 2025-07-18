@@ -4,13 +4,11 @@ import logging
 import asyncio
 import aiohttp
 from db import async_session, Apartment, find_matching_clients
-from dotenv import dotenv_values
 from sqlalchemy.sql import select
+import os
 
 
-# Инициализация бота
-env_values = dotenv_values(".env")
-bot = Bot(token=env_values.get("API_TOKEN"))
+bot = Bot(token=os.getenv("API_TOKEN"))
 
 
 async def is_url_accessible(url: str) -> bool:

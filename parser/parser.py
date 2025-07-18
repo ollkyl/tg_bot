@@ -11,7 +11,6 @@ import json
 from bs4 import BeautifulSoup
 import re
 
-import os
 
 ALGOLIA_BASE_URL = os.getenv("ALGOLIA_BASE_URL")
 ALGOLIA_API_KEY = os.getenv("ALGOLIA_API_KEY")

@@ -1,14 +1,11 @@
 import asyncio
-import logging
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 from bot.handlers import register_handlers
 from parser.parser import main_parser
-from dotenv import dotenv_values
 import asyncpg
 from sqlalchemy.ext.asyncio import create_async_engine
 from db import Base, DATABASE_URL
-
 import os
 
 API_TOKEN = os.getenv("API_TOKEN")
