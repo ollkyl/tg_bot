@@ -1,5 +1,5 @@
 services:
-  - type: web
+  - type: worker
     name: tg-bot
     env: docker
     dockerfilePath: ./Dockerfile
