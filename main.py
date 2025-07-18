@@ -9,7 +9,6 @@ import asyncpg
 from sqlalchemy.ext.asyncio import create_async_engine
 from db import Base, DATABASE_URL
 
-# Загрузка переменных из .env
 env_values = dotenv_values(".env")
 API_TOKEN = env_values["API_TOKEN"]
 ADMIN_ID = int(env_values["ADMIN_ID"])
@@ -39,13 +38,13 @@ async def wait_for_postgres():
 async def init_db():
     engine = create_async_engine(DATABASE_URL, echo=True)
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)  # Создает все таблицы
+        await conn.run_sync(Base.metadata.create_all)
     await engine.dispose()
 
 
 async def main():
-    await wait_for_postgres()  # Ожидание доступности PostgreSQL
-    await init_db()  # Инициализация таблиц
+    await wait_for_postgres()
+    await init_db()
     bot = Bot(token=API_TOKEN)
     dp = Dispatcher(storage=MemoryStorage())
     register_handlers(dp, bot, ADMIN_ID)

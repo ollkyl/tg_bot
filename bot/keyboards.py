@@ -53,7 +53,7 @@ inline_kb = InlineKeyboardMarkup(
 )
 
 main_menu = ReplyKeyboardMarkup(
-    keyboard=[[KeyboardButton(text="Начать сначала")]],
+    keyboard=[[KeyboardButton(text="Выбрать параметры заново")]],
     resize_keyboard=True,
 )
 

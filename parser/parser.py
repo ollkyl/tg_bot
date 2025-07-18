@@ -24,72 +24,6 @@ CLEANUP_INTERVAL_HOURS = 12
 CHECK_INTERVAL_MINUTES = 10
 DB_CLEANUP_DAYS = 7
 
-AMENITIES_TRANSLATION = {
-    "Balcony": "Балкон",
-    "Balcony or Terrace": "Балкон или терраса",
-    "Central A/C": "Центральный кондиционер",
-    "Centrally Air-Conditioned": "Центральный кондиционер",
-    "Central Heating": "Центральное отопление",
-    "Built in Wardrobes": "Встроенные шкафы",
-    "Kitchen Appliances": "Кухонная техника",
-    "View of Water": "Вид на воду",
-    "Private Garden": "Частный сад",
-    "Private Pool": "Частный бассейн",
-    "Security": "Охрана",
-    "Security Staff": "Служба безопасности",
-    "CCTV Security": "Камеры видеонаблюдения",
-    "Intercom": "Домофон",
-    "Reception/Waiting Room": "Ресепшен/Зона ожидания",
-    "Facilities for Disabled": "Удобства для инвалидов",
-    "Double Glazed Windows": "Двойные стеклопакеты",
-    "24 Hours Concierge": "Круглосуточный консьерж",
-    "Cleaning Services": "Услуги уборки",
-    "Maintenance Staff": "Обслуживающий персонал",
-    "Waste Disposal": "Утилизация отходов",
-    "Electricity Backup": "Резервное электропитание",
-    "Satellite/Cable TV": "Спутниковое/кабельное ТВ",
-    "Broadband Internet": "Широкополосный интернет",
-    "Parking": "Парковка",
-    "Parking Spaces": "Парковочные места",
-    "Service Elevators": "Служебные лифты",
-    "Elevators in Building": "Лифты в здании",
-    "Lobby in Building": "Лобби в здании",
-    "Storage Areas": "Кладовые помещения",
-    "Study Room": "Кабинет / Учебная комната",
-    "Prayer Room": "Молельная комната",
-    "First Aid Medical Center": "Медпункт первой помощи",
-    "Gym or Health Club": "Тренажёрный зал / Фитнес-центр",
-    "Sauna": "Сауна",
-    "Steam Room": "Паровая баня",
-    "Jacuzzi": "Джакузи",
-    "Swimming Pool": "Бассейн",
-    "Day Care Center": "Детский сад",
-    "Kids Play Area": "Детская игровая площадка",
-    "Lawn or Garden": "Газон / Сад",
-    "Barbeque Area": "Зона для барбекю",
-    "Cafeteria or Canteen": "Кафетерий / Столовая",
-    "Conference Room": "Конференц-зал",
-    "ATM Facility": "Банкомат",
-    "Business Center": "Бизнес-центр",
-    "Laundry Room": "Прачечная",
-    "Laundry Facility": "Прачечная",
-    "Shared Kitchen": "Общая кухня",
-    "Furnished": "Меблированная",
-    "Maids Room": "Комната для прислуги",
-    # Дополнительные поля из описания (не удобства, но могут встречаться)
-    "Completion Year": "Год завершения строительства",
-    "View": "Вид",
-    "Floor": "Этаж",
-    "Nearby Schools": "Рядом школы",
-    "Nearby Hospitals": "Рядом больницы",
-    "Nearby Shopping Malls": "Рядом торговые центры",
-    "Distance From Airport (kms)": "Расстояние до аэропорта (км)",
-    "Nearby Public Transport": "Общественный транспорт рядом",
-    "Other Nearby Places": "Другие близлежащие места",
-    "Number of Bathrooms": "Количество ванных комнат",
-    "Total Floors": "Общее количество этажей",
-}
-
 
 headers = {
     "X-Algolia-API-Key": ALGOLIA_API_KEY,
@@ -233,11 +167,20 @@ async def process_new_ads():
             async with async_session() as db_session:
                 async with db_session.begin():
                     for hit in new_hits:
+                        # Проверка категории
                         external_id = hit["externalID"]
                         object_id = hit.get("objectID")
                         created_at = datetime.fromtimestamp(hit.get("createdAt", 0)).strftime(
                             "%H:%M"
                         )
+                        if any(
+                            cat["name"].lower() in ["office", "offices", "commercial"]
+                            for cat in hit.get("category", [])
+                        ):
+                            logging.info(
+                                f"Пропуск: externalID={external_id}, категория {hit.get('category', [])}"
+                            )
+                            continue
                         logging.info(
                             f"Обработка: externalID={external_id}, objectID={object_id}, createdAt={created_at}"
                         )
@@ -292,15 +235,8 @@ async def process_new_ads():
                             else:
                                 furnishing = None
 
-                            amenities = detail_hit.get("amenities", [])
-                            translated_amenities = [
-                                AMENITIES_TRANSLATION.get(amenity, amenity) for amenity in amenities
-                            ]
-                            info = (
-                                ", ".join(translated_amenities)
-                                if translated_amenities
-                                else "Нет удобств"
-                            )
+                            amenities = detail_hit.get("amenities_l3", [])
+                            info = ", ".join(amenities) if amenities else "Нет удобств"
 
                             logging.info(f"Удобства для {external_id}: {info}")
 
