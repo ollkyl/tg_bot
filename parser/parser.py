@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 import logging
 from db import add_apartment, async_session, Apartment
 from parser.sending_messages import send_apartment_notification
-from dotenv import dotenv_values
+
 from sqlalchemy.sql import select, delete
 import json
 from bs4 import BeautifulSoup
@@ -22,7 +22,6 @@ LAST_CLEANUP_FILE = "last_cleanup.txt"
 CLEANUP_INTERVAL_HOURS = 12
 CHECK_INTERVAL_MINUTES = 10
 DB_CLEANUP_DAYS = 7
-
 
 headers = {
     "X-Algolia-API-Key": ALGOLIA_API_KEY,
@@ -118,6 +117,9 @@ async def fetch_hits(session, page):
             }
         ]
     }
+    print("ALGOLIA_API_KEY =", repr(ALGOLIA_API_KEY))
+    print("ALGOLIA_APP_ID =", repr(ALGOLIA_APP_ID))
+    print("data =", json.dumps(data, indent=2))
     try:
         async with session.post(
             "https://ll8iz711cs-dsn.algolia.net/1/indexes/*/queries", headers=headers, json=data
