@@ -11,12 +11,12 @@ import json
 from bs4 import BeautifulSoup
 import re
 
+import os
 
-env_values = dotenv_values(".env")
-ALGOLIA_BASE_URL = env_values.get("ALGOLIA_BASE_URL")
-ALGOLIA_API_KEY = env_values.get("ALGOLIA_API_KEY")
-ALGOLIA_APP_ID = env_values.get("ALGOLIA_APP_ID")
-BAYUT_COOKIE = env_values.get("BAYUT_COOKIE")
+ALGOLIA_BASE_URL = os.getenv("ALGOLIA_BASE_URL")
+ALGOLIA_API_KEY = os.getenv("ALGOLIA_API_KEY")
+ALGOLIA_APP_ID = os.getenv("ALGOLIA_APP_ID")
+BAYUT_COOKIE = os.getenv("BAYUT_COOKIE")
 
 ID_LIST_FILE = "id_list.txt"
 LAST_CLEANUP_FILE = "last_cleanup.txt"
