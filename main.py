@@ -9,15 +9,15 @@ import asyncpg
 from sqlalchemy.ext.asyncio import create_async_engine
 from db import Base, DATABASE_URL
 
-env_values = dotenv_values(".env")
-API_TOKEN = env_values["API_TOKEN"]
-ADMIN_ID = int(env_values["ADMIN_ID"])
+import os
 
-DB_HOST = env_values["DB_HOST"]
-DB_PORT = env_values["DB_PORT"]
-DB_NAME = env_values["DB_NAME"]
-DB_USER = env_values["DB_USER"]
-DB_PASS = env_values["DB_PASS"]
+API_TOKEN = os.getenv("API_TOKEN")
+ADMIN_ID = int(os.getenv("ADMIN_ID"))
+DB_HOST = os.getenv("DB_HOST")
+DB_PORT = os.getenv("DB_PORT")
+DB_NAME = os.getenv("DB_NAME")
+DB_USER = os.getenv("DB_USER")
+DB_PASS = os.getenv("DB_PASS")
 
 
 # Ожидание запуска PostgreSQL
