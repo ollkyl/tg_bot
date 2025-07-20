@@ -24,6 +24,7 @@ services:
       DB_PASS: ${DB_PASS}
       DB_NAME: ${DB_NAME}
       DB_HOST: dpg-d1uijhk9c44c73d1obbg-a
+      WEBHOOK_HOST: ${WEBHOOK_HOST}
       DB_PORT: 5432
     ports:
       - "${PORT:-8080}:8080"  
