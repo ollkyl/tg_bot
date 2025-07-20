@@ -1,33 +1,33 @@
 import asyncio
 import logging
+import os
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
 from aiohttp import web
 from bot.handlers import register_handlers
 from parser.parser import main_parser
-from dotenv import dotenv_values
-import asyncpg
 from sqlalchemy.ext.asyncio import create_async_engine
 from db import Base, DATABASE_URL
 
-env_values = dotenv_values(".env")
-API_TOKEN = env_values["API_TOKEN"]
-ADMIN_ID = int(env_values["ADMIN_ID"])
-WEBHOOK_HOST = env_values.get("WEBHOOK_HOST", "https://your-domain.com")
+API_TOKEN = os.environ["API_TOKEN"]
+ADMIN_ID = int(os.environ["ADMIN_ID"])
+WEBHOOK_HOST = os.environ.get("WEBHOOK_HOST", "https://your-service-name.onrender.com")
 WEBHOOK_PATH = "/webhook"
 WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
 WEBAPP_HOST = "0.0.0.0"
-WEBAPP_PORT = int(env_values.get("PORT", 8080))
+WEBAPP_PORT = int(os.environ.get("PORT", 8080))
 
-DB_HOST = env_values["DB_HOST"]
-DB_PORT = env_values["DB_PORT"]
-DB_NAME = env_values["DB_NAME"]
-DB_USER = env_values["DB_USER"]
-DB_PASS = env_values["DB_PASS"]
+DB_HOST = os.environ["DB_HOST"]
+DB_PORT = os.environ["DB_PORT"]
+DB_NAME = os.environ["DB_NAME"]
+DB_USER = os.environ["DB_USER"]
+DB_PASS = os.environ["DB_PASS"]
 
 
 async def wait_for_postgres():
+    import asyncpg
+
     while True:
         try:
             conn = await asyncpg.connect(
