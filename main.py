@@ -1,10 +1,12 @@
 import asyncio
+import logging
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
 from aiohttp import web
 from bot.handlers import register_handlers
 from parser.parser import main_parser
+from dotenv import dotenv_values
 import asyncpg
 from sqlalchemy.ext.asyncio import create_async_engine
 from db import Base, DATABASE_URL
@@ -12,6 +14,11 @@ from db import Base, DATABASE_URL
 env_values = dotenv_values(".env")
 API_TOKEN = env_values["API_TOKEN"]
 ADMIN_ID = int(env_values["ADMIN_ID"])
+WEBHOOK_HOST = env_values.get("WEBHOOK_HOST", "https://your-domain.com")
+WEBHOOK_PATH = "/webhook"
+WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
+WEBAPP_HOST = "0.0.0.0"
+WEBAPP_PORT = int(env_values.get("PORT", 8080))
 
 DB_HOST = env_values["DB_HOST"]
 DB_PORT = env_values["DB_PORT"]
