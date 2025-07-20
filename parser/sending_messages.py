@@ -74,17 +74,36 @@ async def send_apartment_notification(apartment_id):
             "unfurnished": "Немеблированная",
         }
         furnishing = furnishing_translations.get(apt.furnishing, apt.furnishing or "Не указано")
+        name = apt.name
+        price = apt.price
+        rooms = apt.rooms
+        if rooms == 100:
+            rooms = "студия"
+        district = apt.district
+        period = apt.period
+        if period == "monthly":
+            period = "помесячно"
+        elif period == "daily":
+            period = "посуточно"
+        elif period == "yearly":
+            period = "от года"
+        else:
+            period = "Не указано"
+        furnishing = furnishing
+        info = apt.info or "Не указаны удобства"
+        link = apt.link
+        owner = apt.owner.replace(" ", "_")
 
         message = (
-            f"🏠 {apt.name}\n"
-            f"💰 Цена в месяц: {apt.price} AED\n"
-            f"🛏️ Комнаты: {apt.rooms}\n"
-            f"📍 Район: {apt.district}\n"
-            f"⌛ Период: {apt.period}\n"
+            f"🏠 {name}\n"
+            f"💰 Цена в месяц: {price} AED\n"
+            f"🛏️ Комнаты: {rooms}\n"
+            f"📍 Район: {district}\n"
+            f"⌛ Период: {period}\n"
             f"🪑 {furnishing}\n"
-            f"ℹ️ Удобства: {apt.info or 'Не указаны удобства'}\n"
-            f"🔗 <a href='{apt.link}'>Ссылка на объявление</a>\n"
-            f"📞 {apt.owner.replace(' ', '_')}"
+            f"ℹ️ Удобства: {info}\n"
+            f"🔗 <a href='{link}'>Ссылка на объявление</a>\n"
+            f"📞 {owner}"
         )
 
         channel_id = "@apartDubaiApart"
