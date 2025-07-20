@@ -9,8 +9,6 @@ from parser.sending_messages import send_apartment_notification
 from sqlalchemy.sql import select, delete
 import json
 from bs4 import BeautifulSoup
-import re
-
 
 ALGOLIA_BASE_URL = os.getenv("ALGOLIA_BASE_URL")
 ALGOLIA_API_KEY = os.getenv("ALGOLIA_API_KEY")
