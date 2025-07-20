@@ -77,7 +77,7 @@ async def send_apartment_notification(apartment_id):
         name = apt.name
         price = apt.price
         rooms = apt.rooms
-        if rooms == 100:
+        if rooms == 100 or rooms == "100":
             rooms = "студия"
         district = apt.district
         period = apt.period
