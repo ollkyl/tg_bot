@@ -9,8 +9,6 @@ from dotenv import dotenv_values
 from sqlalchemy.sql import select, delete
 import json
 from bs4 import BeautifulSoup
-import re
-
 
 env_values = dotenv_values(".env")
 ALGOLIA_BASE_URL = env_values.get("ALGOLIA_BASE_URL")

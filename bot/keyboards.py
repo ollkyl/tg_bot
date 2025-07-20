@@ -62,7 +62,7 @@ def get_min_price_keyboard():
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text=str(price), callback_data=f"min_{price}")]
-            for price in range(4000, 40000, 2000)
+            for price in range(0, 40000, 2000)
         ]
         + [[InlineKeyboardButton(text="Назад", callback_data="back")]],
     )
