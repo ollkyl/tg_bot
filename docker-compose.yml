@@ -10,8 +10,8 @@ services:
       POSTGRES_DB: ${DB_NAME}
     volumes:
       - pgdata:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
+    # ports:
+    #   - "5432:5432"
 
   bot:
     build: .
@@ -23,8 +23,10 @@ services:
       DB_USER: ${DB_USER}
       DB_PASS: ${DB_PASS}
       DB_NAME: ${DB_NAME}
-      DB_HOST: db
+      DB_HOST: dpg-d1uijhk9c44c73d1obbg-a
       DB_PORT: 5432
+    ports:
+      - "${PORT:-8080}:8080"  
     volumes:
       - .:/app
 
