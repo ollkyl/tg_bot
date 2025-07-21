@@ -12,7 +12,7 @@ from db import Base, DATABASE_URL
 
 API_TOKEN = os.environ["API_TOKEN"]
 ADMIN_ID = int(os.environ["ADMIN_ID"])
-WEBHOOK_HOST = os.environ.get("WEBHOOK_HOST", "https://your-service-name.onrender.com")
+WEBHOOK_HOST = os.environ.get("WEBHOOK_HOST")
 WEBHOOK_PATH = "/webhook"
 WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
 WEBAPP_HOST = "0.0.0.0"
