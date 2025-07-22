@@ -8,6 +8,6 @@ services:
     envVars:
       - key: DATABASE_URL
         fromDatabase:
-          name: findapartbot_vvlr
+          name: findapartmentsbot
           property: connectionString
     port: 10000  

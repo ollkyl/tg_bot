@@ -3,10 +3,9 @@ from aiogram.utils.media_group import MediaGroupBuilder
 import logging
 import asyncio
 import aiohttp
-from db import async_session, Apartment, find_matching_clients
+from db import async_session, Apartment, find_matching_clients, check_subscription
 from sqlalchemy.sql import select
 import os
-
 
 bot = Bot(token=os.getenv("API_TOKEN"))
 
@@ -117,6 +116,11 @@ async def send_apartment_notification(apartment_id):
             sent_usernames = []
             for user_id, user_name in matching_clients:
                 if not user_id:
+                    continue
+                # Проверка подписки
+                has_subscription = await check_subscription(user_id)
+                if not has_subscription:
+                    logging.info(f"[NOTIFY] Пропуск: пользователь {user_id} без подписки")
                     continue
                 if await send_media_group(user_id, photo_urls, message):
                     sent_usernames.append(user_name or "Без имени")

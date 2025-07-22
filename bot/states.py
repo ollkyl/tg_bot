@@ -7,10 +7,14 @@ class Selection(StatesGroup):
     choosing_count_of_rooms = State()
     choosing_district = State()
     choosing_period = State()
-    choosing_furnishing = State()  # Новое состояние
+    choosing_furnishing = State()
     selected_message_id = State()
     user_id = State()
 
 
 class BroadcastState(StatesGroup):
     waiting_for_message = State()
+
+
+class SubscriptionState(StatesGroup):
+    choosing_subscription = State()

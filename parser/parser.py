@@ -35,7 +35,6 @@ headers = {
 if BAYUT_COOKIE:
     headers["Cookie"] = BAYUT_COOKIE
 
-
 try:
     with open("parser/districts.json", "r", encoding="utf-8") as f:
         district_mapping = json.load(f)

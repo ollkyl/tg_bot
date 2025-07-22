@@ -13,11 +13,14 @@ from sqlalchemy import (
     delete,
     select,
 )
+from datetime import datetime, timedelta
 import logging
 import os
+from dotenv import load_dotenv
+from pathlib import Path
 
+load_dotenv(dotenv_path=Path(".") / ".env")
 logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
-
 
 DB_USER = os.getenv("DB_USER")
 DB_PASS = os.getenv("DB_PASS")
@@ -25,7 +28,6 @@ DB_HOST = os.getenv("DB_HOST")
 DB_PORT = os.getenv("DB_PORT")
 DB_NAME = os.getenv("DB_NAME")
 DATABASE_URL = f"postgresql+asyncpg://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
-
 
 engine = create_async_engine(DATABASE_URL, echo=True)
 async_session = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
@@ -63,6 +65,17 @@ class Apartment(Base):
     photo_ids = Column(ARRAY(String))
     object_id = Column(String, nullable=True)
     link = Column(String)
+
+
+class Subscription(Base):
+    __tablename__ = "subscriptions"
+
+    id = Column(BigInteger, primary_key=True, index=True)
+    user_id = Column(BigInteger, nullable=False)
+    subscription_type = Column(String(50), nullable=False)  # day, week, month
+    start_date = Column(DateTime, nullable=False, server_default=func.now())
+    end_date = Column(DateTime, nullable=False)
+    status = Column(String(50), nullable=False, default="active")  # active, expired
 
 
 async def add_client(
@@ -148,3 +161,33 @@ async def get_all_users():
         result = await session.execute(select(Client.user_id))
         users = result.scalars().all()
     return users
+
+
+async def add_subscription(user_id, subscription_type):
+    async with async_session() as session:
+        async with session.begin():
+            duration = {
+                "day": timedelta(days=1),
+                "week": timedelta(days=7),
+                "month": timedelta(days=30),
+            }[subscription_type]
+            new_subscription = Subscription(
+                user_id=user_id,
+                subscription_type=subscription_type,
+                end_date=func.now() + duration,
+                status="active",
+            )
+            session.add(new_subscription)
+        await session.commit()
+
+
+async def check_subscription(user_id):
+    async with async_session() as session:
+        query = select(Subscription).where(
+            (Subscription.user_id == user_id)
+            & (Subscription.status == "active")
+            & (Subscription.end_date >= func.now())
+        )
+        result = await session.execute(query)
+        subscription = result.scalars().first()
+        return subscription is not None

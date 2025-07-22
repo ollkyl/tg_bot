@@ -44,9 +44,8 @@ inline_kb = InlineKeyboardMarkup(
         [InlineKeyboardButton(text="Цена", callback_data="button_price")],
         [InlineKeyboardButton(text="Комнаты", callback_data="button_rooms")],
         [InlineKeyboardButton(text="Срок аренды", callback_data="button_period")],
-        [
-            InlineKeyboardButton(text="Меблировка", callback_data="button_furnishing")
-        ],  # Новая кнопка
+        [InlineKeyboardButton(text="Меблировка", callback_data="button_furnishing")],
+        [InlineKeyboardButton(text="Подписка", callback_data="subscription")],
         [InlineKeyboardButton(text="❕Сохранить выбор❕", callback_data="button_save")],
         [InlineKeyboardButton(text="Отчистить всё", callback_data="button_delete")],
     ]
@@ -56,6 +55,17 @@ main_menu = ReplyKeyboardMarkup(
     keyboard=[[KeyboardButton(text="Выбрать параметры заново")]],
     resize_keyboard=True,
 )
+
+
+def get_subscription_keyboard():
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="1 день", callback_data="day")],
+            [InlineKeyboardButton(text="1 неделя", callback_data="week")],
+            [InlineKeyboardButton(text="1 месяц", callback_data="month")],
+            [InlineKeyboardButton(text="Назад", callback_data="back_to_main")],
+        ]
+    )
 
 
 def get_min_price_keyboard():

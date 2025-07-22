@@ -11,12 +11,14 @@ from bot.keyboards import (
     get_period_keyboard,
     get_district_keyboard,
     get_furnishing_keyboard,
+    get_subscription_keyboard,
     rooms,
     districts,
     finish_messages,
 )
-from bot.states import Selection, BroadcastState
-from db import add_client, get_all_users
+from bot.states import Selection, BroadcastState, SubscriptionState
+from db import add_client, get_all_users, check_subscription, add_subscription
+from datetime import datetime, timedelta
 
 period_translations = {
     "monthly": "помесячно",
@@ -28,7 +30,6 @@ furnishing_translations = {
     "furnished": "Меблированная",
     "unfurnished": "Немеблированная",
 }
-
 
 rooms_translation = {
     "студия": "100",
@@ -44,6 +45,13 @@ def register_handlers(dp, bot, ADMIN_ID):
     async def cmd_cancel(message: types.Message, state: FSMContext):
         await state.clear()
         await message.answer("Операция отменена. Вы можете начать с новой команды.")
+
+    @dp.message(Command("weawer"))
+    async def cmd_weawer(message: types.Message, state: FSMContext):
+        print(f"Получена команда /weawer от user_id={message.from_user.id}")
+        user_id = message.from_user.id
+        await add_subscription(user_id=user_id, subscription_type="day")
+        await message.answer("Доступ к боту на день активирован!", reply_markup=main_menu)
 
     @dp.message(Command("broadcast"))
     async def cmd_broadcast(message: types.Message, state: FSMContext):
@@ -68,6 +76,7 @@ def register_handlers(dp, bot, ADMIN_ID):
 
     @dp.message(Command("start"))
     async def send_welcome(message: types.Message, state: FSMContext):
+        print(f"Получена команда /start от user_id={message.from_user.id}")
         await state.clear()
         user_id = message.from_user.id
         user_name = message.from_user.username
@@ -228,6 +237,13 @@ def register_handlers(dp, bot, ADMIN_ID):
     async def go_back(callback: types.CallbackQuery, state: FSMContext):
         await callback.message.edit_text("Выберите параметры:", reply_markup=inline_kb)
 
+    @dp.callback_query(F.data == "subscription")
+    async def show_subscription_menu(callback: types.CallbackQuery, state: FSMContext):
+        await callback.message.edit_text(
+            "Выберите тип подписки:", reply_markup=get_subscription_keyboard()
+        )
+        await state.set_state(SubscriptionState.choosing_subscription)
+
     @dp.callback_query(F.data == "button_delete")
     async def delete_data(callback: types.CallbackQuery, state: FSMContext):
         data = await state.get_data()
@@ -275,16 +291,36 @@ def register_handlers(dp, bot, ADMIN_ID):
         min_price = data.get("min_price", 0)
         max_price = data.get("max_price", 1000000)
         periods = data.get("periods", [])
-        period = ", ".join(periods) if periods else None  # Преобразуем список в строку
+        period = ", ".join(periods) if periods else None
         furnishing_list = data.get("furnishing", [])
         furnishing = None
         if len(furnishing_list) == 1:
-            furnishing = (
-                furnishing_list[0] == "furnished"
-            )  # True если 'furnished', False если 'unfurnished'
+            furnishing = furnishing_list[0] == "furnished"
         user_id = data.get("user_id")
         user_name = data.get("user_name")
         save_count = data.get("save_count", 0)
+
+        # Проверка подписки
+        has_subscription = await check_subscription(user_id)
+        if not has_subscription:
+            await callback.message.answer(
+                "Для получения объявлений оформите подписку через кнопку 'Подписка'.",
+                reply_markup=main_menu,
+            )
+            await callback.answer("Подписка требуется!")
+            # Сохраняем параметры, чтобы пользователь мог их использовать после оплаты
+            await add_client(
+                user_id,
+                min_price,
+                max_price,
+                count_of_rooms,
+                district,
+                period,
+                user_name,
+                furnishing,
+            )
+            return
+
         await add_client(
             user_id,
             min_price,
