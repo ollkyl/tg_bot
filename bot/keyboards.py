@@ -52,7 +52,7 @@ inline_kb = InlineKeyboardMarkup(
 )
 
 main_menu = ReplyKeyboardMarkup(
-    keyboard=[[KeyboardButton(text="Выбрать параметры заново")]],
+    keyboard=[[KeyboardButton(text="Вызвать меню")]],
     resize_keyboard=True,
 )
 
@@ -104,15 +104,12 @@ def get_period_keyboard(selected_periods):
         ("посуточно", "daily"),
         ("от года", "yearly"),
     ]
-
     buttons = []
     for label, value in options:
         text = f"✅ {label}" if value in selected_periods else label
         buttons.append([InlineKeyboardButton(text=text, callback_data=value)])
-
     buttons.append([InlineKeyboardButton(text="Готово", callback_data="period_done")])
     buttons.append([InlineKeyboardButton(text="Назад", callback_data="back")])
-
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
@@ -131,13 +128,10 @@ def get_furnishing_keyboard(selected_furnishing):
         ("Меблированная", "furnished"),
         ("Немеблированная", "unfurnished"),
     ]
-
     buttons = []
     for label, value in options:
         text = f"✅ {label}" if value in selected_furnishing else label
         buttons.append([InlineKeyboardButton(text=text, callback_data=value)])
-
     buttons.append([InlineKeyboardButton(text="Готово", callback_data="furnishing_done")])
     buttons.append([InlineKeyboardButton(text="Назад", callback_data="back")])
-
     return InlineKeyboardMarkup(inline_keyboard=buttons)

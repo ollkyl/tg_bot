@@ -1,0 +1,120 @@
+from aiogram import types, F
+from aiogram.fsm.context import FSMContext
+from aiogram.types import LabeledPrice, InlineKeyboardMarkup, InlineKeyboardButton
+from bot.keyboards import get_subscription_keyboard, inline_kb
+from bot.states import SubscriptionState
+from db import add_subscription, check_subscription
+from .start import (
+    get_selected_text,
+    subscription_translations,
+    period_translations,
+    furnishing_translations,
+)
+
+
+def register_subscription(dp, bot):
+    @dp.callback_query(F.data == "subscription")
+    async def show_subscription_menu(callback: types.CallbackQuery, state: FSMContext):
+        await callback.message.edit_text(
+            "Выберите тип подписки:", reply_markup=get_subscription_keyboard()
+        )
+        await state.set_state(SubscriptionState.choosing_subscription)
+        await callback.answer()
+
+    @dp.callback_query(F.data == "back_to_subscription")
+    async def back_to_subscription(callback: types.CallbackQuery, state: FSMContext):
+        data = await state.get_data()
+        invoice_message_id = data.get("invoice_message_id")
+        if invoice_message_id:
+            try:
+                await bot.delete_message(
+                    chat_id=callback.message.chat.id, message_id=invoice_message_id
+                )
+            except Exception as e:
+                print(f"Ошибка удаления инвойса: {e}")
+
+        await callback.message.edit_text(
+            "Выберите тип подписки:", reply_markup=get_subscription_keyboard()
+        )
+        await state.update_data(invoice_message_id=None)
+        await state.set_state(SubscriptionState.choosing_subscription)
+        await callback.answer()
+
+    @dp.callback_query(F.data.in_(["day", "week", "month"]))
+    async def process_subscription_choice(callback: types.CallbackQuery, state: FSMContext):
+        subscription_type = callback.data
+        prices = {
+            "day": [LabeledPrice(label="Подписка на день", amount=100)],
+            "week": [LabeledPrice(label="Подписка на неделю", amount=500)],
+            "month": [LabeledPrice(label="Подписка на месяц", amount=1500)],
+        }
+        data = await state.get_data()
+        invoice_message_id = data.get("invoice_message_id")
+        if invoice_message_id:
+            try:
+                await bot.delete_message(
+                    chat_id=callback.message.chat.id, message_id=invoice_message_id
+                )
+            except Exception as e:
+                print(f"Ошибка удаления инвойса: {e}")
+        await state.update_data(subscription_type=subscription_type)
+
+        pay_button = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text="Оплатить", pay=True)],
+                [InlineKeyboardButton(text="Назад", callback_data="back_to_subscription")],
+            ]
+        )
+        invoice_message = await bot.send_invoice(
+            chat_id=callback.message.chat.id,
+            title=f"Подписка на {subscription_translations.get(subscription_type, subscription_type)}",
+            description=f"Доступ к боту на {subscription_translations.get(subscription_type, subscription_type)}",
+            payload=f"{subscription_type}_subscription",
+            provider_token="",
+            currency="XTR",
+            prices=prices[subscription_type],
+            start_parameter="subscription",
+            reply_markup=pay_button,
+        )
+        await state.update_data(invoice_message_id=invoice_message.message_id)
+        await callback.message.edit_text("Выберите параметры:", reply_markup=inline_kb)
+        await callback.answer()
+
+    @dp.pre_checkout_query()
+    async def process_pre_checkout_query(pre_checkout_query: types.PreCheckoutQuery):
+        await pre_checkout_query.answer(ok=True)
+
+    @dp.message(F.successful_payment)
+    async def process_successful_payment(message: types.Message, state: FSMContext):
+        data = await state.get_data()
+        subscription_type = data.get("subscription_type")
+        menu_message_id = data.get("menu_message_id")
+        invoice_message_id = data.get("invoice_message_id")
+        if invoice_message_id:
+            try:
+                await bot.delete_message(chat_id=message.chat.id, message_id=invoice_message_id)
+            except Exception as e:
+                print(f"Ошибка удаления инвойса: {e}")
+        await add_subscription(user_id=message.from_user.id, subscription_type=subscription_type)
+
+        try:
+            if menu_message_id:
+                await bot.edit_message_text(
+                    text="Выберите параметры:",
+                    chat_id=message.chat.id,
+                    message_id=menu_message_id,
+                    reply_markup=inline_kb,
+                )
+            else:
+                menu_message = await message.answer("Выберите параметры:", reply_markup=inline_kb)
+                await state.update_data(menu_message_id=menu_message.message_id)
+        except Exception as e:
+            print(f"Ошибка редактирования меню: {e}")
+            menu_message = await message.answer("Выберите параметры:", reply_markup=inline_kb)
+            await state.update_data(menu_message_id=menu_message.message_id)
+        await state.update_data(invoice_message_id=None)
+        await state.clear()
+        await message.answer(
+            f"Оплата прошла успешно! Доступ к боту на {subscription_translations.get(subscription_type, subscription_type)} активирован!",
+            reply_markup=inline_kb,
+        )

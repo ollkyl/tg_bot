@@ -6,7 +6,6 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
 from aiohttp import web
 from bot.handlers import register_handlers
-from bot.subscription_handlers import router as subscription_router
 from parser.parser import main_parser
 from sqlalchemy.ext.asyncio import create_async_engine
 from db import Base, DATABASE_URL
@@ -70,12 +69,10 @@ async def main():
     bot = Bot(token=API_TOKEN)
     dp = Dispatcher(storage=MemoryStorage())
     register_handlers(dp, bot, ADMIN_ID)
-    dp.include_router(subscription_router)
 
     use_webhook = os.environ.get("USE_WEBHOOK", "False").lower() == "true"
 
     if use_webhook:
-        # Webhook-режим
         app = web.Application()
         webhook_handler = SimpleRequestHandler(dispatcher=dp, bot=bot)
         webhook_handler.register(app, path=WEBHOOK_PATH)
@@ -92,7 +89,6 @@ async def main():
             await on_shutdown(bot)
             await runner.cleanup()
     else:
-        # Polling-режим (локальная разработка)
         print("▶️ Запуск в режиме polling")
         try:
             await asyncio.gather(dp.start_polling(bot), main_parser())

@@ -132,10 +132,11 @@ async def add_apartment(
 
 async def find_matching_clients(apartment):
     async with async_session() as session:
-        query = select(Client)
+        query = select(Client).where(Client.status == "Y")  # Только активные клиенты
         if apartment.price:
             query = query.where(
-                (Client.min_price <= apartment.price) & (Client.max_price >= apartment.price)
+                ((Client.min_price <= apartment.price) | (Client.min_price == None))
+                & ((Client.max_price >= apartment.price) | (Client.max_price == None))
             )
         if apartment.rooms:
             query = query.where((Client.rooms.contains(apartment.rooms)) | (Client.rooms == None))
