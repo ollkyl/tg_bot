@@ -26,6 +26,25 @@ rooms_translation = {
 subscription_translations = {"day": "день", "week": "неделю", "month": "месяц"}
 
 
+async def update_selected_message(callback: types.CallbackQuery, state: FSMContext, bot):
+    data = await state.get_data()
+    selected_text = get_selected_text(data)
+    selected_message_id = data.get("selected_message_id")
+    try:
+        if selected_message_id:
+            await bot.edit_message_text(
+                text=selected_text,
+                chat_id=callback.message.chat.id,
+                message_id=selected_message_id,
+                parse_mode="HTML",
+            )
+        else:
+            params_message = await callback.message.answer(selected_text, parse_mode="HTML")
+            await state.update_data(selected_message_id=params_message.message_id)
+    except Exception:
+        print("Ошибка при обновлении сообщения с выбранными параметрами.")
+
+
 def get_selected_text(data):
     districts = ", ".join(data.get("districts", [])) or "Не выбрано"
     rooms = ", ".join(data.get("count_of_rooms", [])) or "Не выбрано"
@@ -61,7 +80,7 @@ def register_start(dp, bot):
             reply_markup=main_menu,
         )
         menu_message = await message.answer("Выберите параметры:", reply_markup=inline_kb)
-        selected_text = get_selected_text({}, period_translations, furnishing_translations)
+        selected_text = get_selected_text({})
         params_message = await message.answer(selected_text, parse_mode="HTML")
         await state.update_data(
             menu_message_id=menu_message.message_id,

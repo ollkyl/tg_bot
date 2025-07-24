@@ -8,22 +8,8 @@ from bot.handlers.start import (
     rooms_translation,
 )
 
-
-async def update_selected_message(callback: types.CallbackQuery, state: FSMContext, bot):
-    data = await state.get_data()
-    selected_text = get_selected_text(data)
-    selected_message_id = data.get("selected_message_id")
-
-    if selected_message_id:
-        try:
-            await bot.edit_message_text(
-                text=selected_text,
-                chat_id=callback.message.chat.id,
-                message_id=selected_message_id,
-                parse_mode="HTML",
-            )
-        except Exception:
-            pass  # не создаём новое сообщение, просто игнорируем
+# Обратный словарь для преобразования комнат в формат БД
+reverse_rooms_translation = {v: k for k, v in rooms_translation.items()}
 
 
 def register_save_delete(dp, bot):
@@ -33,8 +19,9 @@ def register_save_delete(dp, bot):
         districts_selected = data.get("districts", [])
         district = ", ".join(districts_selected) if districts_selected else None
         selected_rooms = data.get("count_of_rooms", [])
+        # Преобразование комнат в формат "100, 1"
         count_of_rooms = (
-            ", ".join(rooms_translation.get(room, room) for room in selected_rooms)
+            ", ".join(reverse_rooms_translation.get(room, room) for room in selected_rooms)
             if selected_rooms
             else None
         )
@@ -51,7 +38,7 @@ def register_save_delete(dp, bot):
         has_subscription = await check_subscription(user_id)
         if not has_subscription:
             await callback.message.answer(
-                "Для получения объявлений оформите подписку через кнопку 'Подписка'.",
+                "Для получения объявлений оформите подписку ⭐.",
                 reply_markup=main_menu,
             )
             await callback.answer("Подписка требуется!")
@@ -91,8 +78,38 @@ def register_save_delete(dp, bot):
             sent_message = await callback.message.answer(finish_message, parse_mode="HTML")
             await state.update_data(finish_message_id=sent_message.message_id)
 
-        await update_selected_message(callback, state, bot)
-        await callback.message.edit_text("Выберите параметры:", reply_markup=inline_kb)
+        # Обновление сообщения с параметрами
+        selected_text = get_selected_text(data)
+        selected_message_id = data.get("selected_message_id")
+        try:
+            if selected_message_id:
+                await bot.edit_message_text(
+                    text=selected_text,
+                    chat_id=callback.message.chat.id,
+                    message_id=selected_message_id,
+                    parse_mode="HTML",
+                )
+            else:
+                sent_message = await callback.message.answer(selected_text, parse_mode="HTML")
+                await state.update_data(selected_message_id=sent_message.message_id)
+        except AiogramError as e:
+            if "message is not modified" in str(e):
+                print("Сообщение с параметрами не изменилось.")
+            else:
+                sent_message = await callback.message.answer(selected_text, parse_mode="HTML")
+                await state.update_data(selected_message_id=sent_message.message_id)
+
+        # Проверка перед редактированием меню
+        current_menu_text = data.get("current_menu_text", "")
+        if current_menu_text != "Выберите параметры:":
+            try:
+                await callback.message.edit_text("Выберите параметры:", reply_markup=inline_kb)
+                await state.update_data(current_menu_text="Выберите параметры:")
+            except AiogramError as e:
+                if "message is not modified" in str(e):
+                    print("Меню не изменилось, пропускаем редактирование.")
+                else:
+                    raise
 
     @dp.callback_query(F.data == "button_delete")
     async def delete_data(callback: types.CallbackQuery, state: FSMContext):
@@ -103,7 +120,14 @@ def register_save_delete(dp, bot):
         menu_message_id = data.get("menu_message_id")
         finish_message_id = data.get("finish_message_id")
         save_count = data.get("save_count", 0)
-        selected_text = get_selected_text({})
+        selected_text = (
+            "Выбраные параметры:\n"
+            "<code>🏠 Районы:</code> <b>Не выбрано</b>\n"
+            "<code>💰 Диапазон цены:</code> <b>Не выбрано</b>\n"
+            "<code>🛏 Комнаты:</code> <b>Не выбрано</b>\n"
+            "<code>📆 Срок аренды:</code> <b>Не выбрано</b>\n"
+            "<code>🪑 Меблировка:</code> <b>Не выбрано</b>"
+        )
         await state.update_data(
             user_id=user_id,
             user_name=user_name,
@@ -126,6 +150,22 @@ def register_save_delete(dp, bot):
                 )
             except Exception:
                 pass
-        await update_selected_message(callback, state, bot)
-        await callback.message.edit_text("Выберите параметры:", reply_markup=inline_kb)
+        if selected_message_id:
+            try:
+                await bot.edit_message_text(
+                    text=selected_text,
+                    chat_id=callback.message.chat.id,
+                    message_id=selected_message_id,
+                    parse_mode="HTML",
+                )
+            except AiogramError as e:
+                if "message is not modified" in str(e):
+                    print("Сообщение с параметрами не изменилось.")
+                else:
+                    sent_message = await callback.message.answer(selected_text, parse_mode="HTML")
+                    await state.update_data(selected_message_id=sent_message.message_id)
+        current_menu_text = data.get("current_menu_text", "")
+        if current_menu_text != "Выберите параметры:":
+            await callback.message.edit_text("Выберите параметры:", reply_markup=inline_kb)
+            await state.update_data(current_menu_text="Выберите параметры:")
         await callback.answer()

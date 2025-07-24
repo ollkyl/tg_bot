@@ -12,27 +12,7 @@ from bot.keyboards import (
     districts,
 )
 from bot.states import Selection
-from bot.handlers.start import get_selected_text
-
-
-async def update_selected_message(callback: types.CallbackQuery, state: FSMContext, bot):
-    data = await state.get_data()
-    selected_text = get_selected_text(data)
-    selected_message_id = data.get("selected_message_id")
-    try:
-        if selected_message_id:
-            await bot.edit_message_text(
-                text=selected_text,
-                chat_id=callback.message.chat.id,
-                message_id=selected_message_id,
-                parse_mode="HTML",
-            )
-        else:
-            params_message = await callback.message.answer(selected_text, parse_mode="HTML")
-            await state.update_data(selected_message_id=params_message.message_id)
-    except Exception:
-        params_message = await callback.message.answer(selected_text, parse_mode="HTML")
-        await state.update_data(selected_message_id=params_message.message_id)
+from bot.handlers.start import update_selected_message
 
 
 async def return_to_main_menu(callback: types.CallbackQuery, state: FSMContext, bot):

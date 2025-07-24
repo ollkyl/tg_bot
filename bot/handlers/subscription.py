@@ -97,21 +97,21 @@ def register_subscription(dp, bot):
                 print(f"Ошибка удаления инвойса: {e}")
         await add_subscription(user_id=message.from_user.id, subscription_type=subscription_type)
 
-        try:
-            if menu_message_id:
-                await bot.edit_message_text(
-                    text="Выберите параметры:",
-                    chat_id=message.chat.id,
-                    message_id=menu_message_id,
-                    reply_markup=inline_kb,
-                )
-            else:
-                menu_message = await message.answer("Выберите параметры:", reply_markup=inline_kb)
-                await state.update_data(menu_message_id=menu_message.message_id)
-        except Exception as e:
-            print(f"Ошибка редактирования меню: {e}")
-            menu_message = await message.answer("Выберите параметры:", reply_markup=inline_kb)
-            await state.update_data(menu_message_id=menu_message.message_id)
+        # try:
+        #     if menu_message_id:
+        #         await bot.edit_message_text(
+        #             text="Выберите параметры:",
+        #             chat_id=message.chat.id,
+        #             message_id=menu_message_id,
+        #             reply_markup=inline_kb,
+        #         )
+        #     else:
+        #         menu_message = await message.answer("Выберите параметры:", reply_markup=inline_kb)
+        #         await state.update_data(menu_message_id=menu_message.message_id)
+        # except Exception as e:
+        #     print(f"Ошибка редактирования меню: {e}")
+        #     menu_message = await message.answer("Выберите параметры:", reply_markup=inline_kb)
+        #     await state.update_data(menu_message_id=menu_message.message_id)
         await state.update_data(invoice_message_id=None)
         await state.clear()
         await message.answer(
