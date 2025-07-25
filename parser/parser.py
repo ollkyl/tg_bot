@@ -8,29 +8,19 @@ from parser.sending_messages import send_apartment_notification
 from sqlalchemy.sql import select, delete
 import json
 from bs4 import BeautifulSoup
-from aiohttp import ClientSession
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
-# Настройка логирования
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-
-# Константы
 ALGOLIA_BASE_URL = os.getenv("ALGOLIA_BASE_URL")
 ALGOLIA_API_KEY = os.getenv("ALGOLIA_API_KEY")
 ALGOLIA_APP_ID = os.getenv("ALGOLIA_APP_ID")
 BAYUT_COOKIE = os.getenv("BAYUT_COOKIE")
+
 ID_LIST_FILE = "id_list.txt"
 LAST_CLEANUP_FILE = "last_cleanup.txt"
 CLEANUP_INTERVAL_HOURS = 12
 CHECK_INTERVAL_MINUTES = 10
 DB_CLEANUP_DAYS = 7
-
-# Проверка переменных окружения
-if not all([ALGOLIA_BASE_URL, ALGOLIA_API_KEY, ALGOLIA_APP_ID]):
-    logging.critical(
-        "Отсутствуют необходимые переменные окружения (ALGOLIA_BASE_URL, ALGOLIA_API_KEY, ALGOLIA_APP_ID)"
-    )
-    exit(1)
+print("ALGOLIA_API_KEY =", repr(ALGOLIA_API_KEY))
+print("ALGOLIA_APP_ID =", repr(ALGOLIA_APP_ID))
 
 headers = {
     "X-Algolia-API-Key": ALGOLIA_API_KEY,
@@ -44,40 +34,26 @@ headers = {
 if BAYUT_COOKIE:
     headers["Cookie"] = BAYUT_COOKIE
 
-# Загрузка маппинга районов
 try:
     with open("parser/districts.json", "r", encoding="utf-8") as f:
         district_mapping = json.load(f)
-except (FileNotFoundError, json.JSONDecodeError) as e:
-    logging.error(f"Ошибка загрузки districts.json: {e}")
+except FileNotFoundError:
+    logging.error("Файл districts.json не найден.")
+    district_mapping = {}
+except json.JSONDecodeError as e:
+    logging.error(f"Некорректный JSON в districts.json: {e}.")
     district_mapping = {}
 
-# Чтение существующих ID
 existing_ids = set()
 if os.path.exists(ID_LIST_FILE):
-    try:
-        with open(ID_LIST_FILE, "r", encoding="utf-8") as f:
-            existing_ids = set(line.strip() for line in f if line.strip())
-    except Exception as e:
-        logging.error(f"Ошибка чтения {ID_LIST_FILE}: {e}")
+    with open(ID_LIST_FILE, "r") as f:
+        existing_ids = set(line.strip() for line in f if line.strip())
 
 
-def find_district(district_name):
-    for district, areas in district_mapping.items():
-        if district_name in areas:
-            return district
-    return district_name
-
-
-@retry(
-    stop=stop_after_attempt(3),
-    wait=wait_exponential(multiplier=1, min=2, max=10),
-    retry=retry_if_exception_type((aiohttp.ClientError, asyncio.TimeoutError)),
-)
-async def get_contact_phone_from_html(session: ClientSession, external_id: str) -> str:
+async def get_contact_phone_from_html(session, external_id):
     url = f"https://www.bayut.com/property/details-{external_id}.html"
     try:
-        async with session.get(url, headers=headers, timeout=10) as response:
+        async with session.get(url, headers=headers) as response:
             if response.status == 200:
                 html = await response.text()
                 soup = BeautifulSoup(html, "html.parser")
@@ -90,23 +66,18 @@ async def get_contact_phone_from_html(session: ClientSession, external_id: str) 
                 logging.warning(f"Не найден телефон для external_id={external_id}")
                 return "No phone found"
             logging.error(
-                f"Ошибка загрузки HTML для external_id={external_id}: статус {response.status}"
+                f"Ошибка загрузки HTML для телефона external_id={external_id}: статус {response.status}"
             )
             return "No phone found"
     except Exception as e:
         logging.error(f"Ошибка получения телефона для external_id={external_id}: {e}")
-        return "No phone found"
+        return "No phone"
 
 
-@retry(
-    stop=stop_after_attempt(3),
-    wait=wait_exponential(multiplier=1, min=2, max=10),
-    retry=retry_if_exception_type((aiohttp.ClientError, asyncio.TimeoutError)),
-)
-async def get_furnishing_from_html(session: ClientSession, external_id: str) -> bool | None:
+async def get_furnishing_from_html(session, external_id):
     url = f"https://www.bayut.com/property/details-{external_id}.html"
     try:
-        async with session.get(url, headers=headers, timeout=10) as response:
+        async with session.get(url, headers=headers) as response:
             if response.status != 200:
                 logging.error(f"[HTML] статус {response.status} для {external_id}")
                 return None
@@ -123,38 +94,36 @@ async def get_furnishing_from_html(session: ClientSession, external_id: str) -> 
         return None
 
 
+def find_district(district_name):
+    for district, areas in district_mapping.items():
+        if district_name in areas:
+            return district
+    return district_name
+
+
 async def cleanup_old_ids_and_db():
     current_time = datetime.now()
-    try:
-        if os.path.exists(LAST_CLEANUP_FILE):
-            with open(LAST_CLEANUP_FILE, "r") as f:
-                content = f.read().strip()
-                last_cleanup = datetime.fromtimestamp(float(content)) if content else current_time
-            if (current_time - last_cleanup).total_seconds() < CLEANUP_INTERVAL_HOURS * 3600:
-                return
-        with open(ID_LIST_FILE, "w", encoding="utf-8") as f:
-            f.write("")
-        async with async_session() as db_session:
-            async with db_session.begin():
-                await db_session.execute(
-                    delete(Apartment).where(
-                        Apartment.created_at < current_time - timedelta(days=DB_CLEANUP_DAYS)
+    if os.path.exists(LAST_CLEANUP_FILE):
+        with open(LAST_CLEANUP_FILE, "r") as f:
+            content = f.read().strip()
+            last_cleanup = datetime.fromtimestamp(float(content)) if content else current_time
+        if (current_time - last_cleanup).total_seconds() >= CLEANUP_INTERVAL_HOURS * 3600:
+            with open(ID_LIST_FILE, "w") as f:
+                f.write("")
+            async with async_session() as db_session:
+                async with db_session.begin():
+                    await db_session.execute(
+                        delete(Apartment).where(
+                            Apartment.created_at < current_time - timedelta(days=DB_CLEANUP_DAYS)
+                        )
                     )
-                )
-                await db_session.commit()
-        with open(LAST_CLEANUP_FILE, "w", encoding="utf-8") as f:
-            f.write(str(current_time.timestamp()))
-        logging.info("Очищены id_list.txt и старые записи в БД")
-    except Exception as e:
-        logging.error(f"Ошибка при очистке ID и БД: {e}")
+                    await db_session.commit()
+            with open(LAST_CLEANUP_FILE, "w") as f:
+                f.write(str(current_time.timestamp()))
+            logging.info("Очищены id_list.txt и старые записи в БД")
 
 
-@retry(
-    stop=stop_after_attempt(3),
-    wait=wait_exponential(multiplier=1, min=2, max=10),
-    retry=retry_if_exception_type((aiohttp.ClientError, asyncio.TimeoutError)),
-)
-async def fetch_hits(session: ClientSession, page: int) -> dict:
+async def fetch_hits(session, page):
     start_time = datetime.now() - timedelta(minutes=12)
     start_timestamp = int(start_time.timestamp())
     data = {
@@ -165,29 +134,29 @@ async def fetch_hits(session: ClientSession, page: int) -> dict:
             }
         ]
     }
-    async with session.post(
-        "https://ll8iz711cs-dsn.algolia.net/1/indexes/*/queries",
-        headers=headers,
-        json=data,
-        timeout=10,
-    ) as response:
-        if response.status == 200:
-            return await response.json()
-        logging.error(f"Ошибка Algolia API для page={page}: статус {response.status}")
+    try:
+        async with session.post(
+            "https://ll8iz711cs-dsn.algolia.net/1/indexes/*/queries", headers=headers, json=data
+        ) as response:
+            if response.status == 200:
+                return await response.json()
+            logging.error(f"Ошибка Algolia API для page={page}: статус {response.status}")
+            return {"results": [{"hits": []}]}
+    except Exception as e:
+        logging.error(f"Ошибка запроса Algolia API: {e}")
         return {"results": [{"hits": []}]}
 
 
-@retry(
-    stop=stop_after_attempt(3),
-    wait=wait_exponential(multiplier=1, min=2, max=10),
-    retry=retry_if_exception_type((aiohttp.ClientError, asyncio.TimeoutError)),
-)
-async def fetch_detail(session: ClientSession, object_id: str) -> dict | None:
+async def fetch_detail(session, object_id):
     detail_url = f"{ALGOLIA_BASE_URL}/{object_id}"
-    async with session.get(detail_url, headers=headers, timeout=10) as response:
-        if response.status == 200:
-            return await response.json()
-        logging.error(f"Ошибка Algolia API для object_id={object_id}: статус {response.status}")
+    try:
+        async with session.get(detail_url, headers=headers) as response:
+            if response.status == 200:
+                return await response.json()
+            logging.error(f"Ошибка Algolia API для object_id={object_id}: статус {response.status}")
+            return None
+    except Exception as e:
+        logging.error(f"Ошибка запроса Algolia API для object_id={object_id}: {e}")
         return None
 
 
@@ -240,57 +209,57 @@ async def process_new_ads():
                             continue
 
                         detail_hit = await fetch_detail(session, object_id)
-                        if not detail_hit:
-                            logging.error(f"Ошибка API для external_id={external_id}: нет данных")
-                            continue
+                        if detail_hit:
+                            owner = await get_contact_phone_from_html(session, external_id)
+                            if owner == "No phone found":
+                                owner = detail_hit.get("phoneNumber", {}).get("mobile", "Unknown")
+                            name = detail_hit.get("title", "No title")
+                            price = detail_hit.get("price", 0.0)
 
-                        owner = await get_contact_phone_from_html(session, external_id)
-                        if owner == "No phone found":
-                            owner = detail_hit.get("phoneNumber", {}).get("mobile", "Unknown")
-                        name = detail_hit.get("title", "No title")
-                        price = detail_hit.get("price", 0.0)
+                            rooms_raw = detail_hit.get("rooms")
+                            if rooms_raw in [None, 0]:
+                                rooms = "100"
+                            else:
+                                rooms = str(rooms_raw)
+                            location_data = detail_hit.get("location", [])
+                            district_area = next(
+                                (
+                                    loc["name"]
+                                    for loc in location_data
+                                    if loc.get("type") == "neighbourhood"
+                                ),
+                                "Unknown",
+                            )
+                            district = find_district(district_area)
+                            raw_period = detail_hit.get("rentFrequency", "yearly")
+                            period = raw_period
+                            if raw_period == "yearly":
+                                price = round(price / 12)
+                            elif raw_period == "weekly":
+                                price = round(price * 4.345)
+                            elif raw_period == "daily":
+                                price = round(price * 30)
 
-                        rooms_raw = detail_hit.get("rooms")
-                        rooms = "100" if rooms_raw in [None, 0] else str(rooms_raw)
+                            furnishing_status = detail_hit.get("furnishingStatus")
+                            if furnishing_status == "furnished":
+                                furnishing = True
+                            elif furnishing_status == "unfurnished":
+                                furnishing = False
+                            else:
+                                furnishing = await get_furnishing_from_html(session, external_id)
 
-                        location_data = detail_hit.get("location", [])
-                        district_area = next(
-                            (
-                                loc["name"]
-                                for loc in location_data
-                                if loc.get("type") == "neighbourhood"
-                            ),
-                            "Unknown",
-                        )
-                        district = find_district(district_area)
-                        raw_period = detail_hit.get("rentFrequency", "yearly")
-                        period = raw_period
-                        if raw_period == "yearly":
-                            price = round(price / 12)
-                        elif raw_period == "weekly":
-                            price = round(price * 4.345)
-                        elif raw_period == "daily":
-                            price = round(price * 30)
+                            amenities = detail_hit.get("amenities_l3", [])
+                            info = ", ".join(amenities) if amenities else "Нет удобств"
+                            logging.info(f"Удобства для {external_id}: {info}")
 
-                        furnishing_status = detail_hit.get("furnishingStatus")
-                        if furnishing_status == "furnished":
-                            furnishing = True
-                        elif furnishing_status == "unfurnished":
-                            furnishing = False
-                        else:
-                            furnishing = await get_furnishing_from_html(session, external_id)
+                            cover_id = detail_hit.get("coverPhoto", {}).get("externalID", "")
+                            photo_ids = [
+                                str(photo_id) for photo_id in detail_hit.get("photoIDs", [])
+                            ]
+                            if cover_id and str(cover_id) not in photo_ids:
+                                photo_ids.insert(0, str(cover_id))
+                            link = f"https://www.bayut.com/property/details-{external_id}.html"
 
-                        amenities = detail_hit.get("amenities_l3", [])
-                        info = ", ".join(amenities) if amenities else "Нет удобств"
-                        logging.info(f"Удобства для {external_id}: {info}")
-
-                        cover_id = detail_hit.get("coverPhoto", {}).get("externalID", "")
-                        photo_ids = [str(photo_id) for photo_id in detail_hit.get("photoIDs", [])]
-                        if cover_id and str(cover_id) not in photo_ids:
-                            photo_ids.insert(0, str(cover_id))
-                        link = f"https://www.bayut.com/property/details-{external_id}.html"
-
-                        try:
                             apartment_id, matching_clients = await add_apartment(
                                 owner,
                                 name,
@@ -308,33 +277,24 @@ async def process_new_ads():
                                 f"Сохранено в БД: ID={apartment_id}, Клиентов: {len(matching_clients)}, Link={link}"
                             )
                             stats["successful_adds"] += 1
+
                             await send_apartment_notification(apartment_id)
-                        except Exception as e:
-                            logging.error(
-                                f"Ошибка сохранения в БД для external_id={external_id}: {e}"
-                            )
-                        await asyncio.sleep(2)  # Уменьшен интервал для оптимизации
-        except Exception as e:
-            logging.error(f"Критическая ошибка в process_new_ads: {e}")
+                        else:
+                            logging.error(f"Ошибка API для external_id={external_id}: нет данных")
+                        await asyncio.sleep(20)
         finally:
             await session.close()
 
     if new_hits:
-        try:
-            with open(ID_LIST_FILE, "a", encoding="utf-8") as f:
-                for hit in new_hits:
-                    f.write(f"{hit['externalID']}\n")
-            logging.info(f"Добавлено новых ID в id_list.txt: {len(new_hits)}")
-        except Exception as e:
-            logging.error(f"Ошибка записи в {ID_LIST_FILE}: {e}")
+        with open(ID_LIST_FILE, "a") as f:
+            for hit in new_hits:
+                f.write(f"{hit['externalID']}\n")
+        logging.info(f"Добавлено новых ID в id_list.txt: {len(new_hits)}")
 
 
 async def main_parser():
     while True:
-        try:
-            await process_new_ads()
-        except Exception as e:
-            logging.error(f"Ошибка в main_parser: {e}")
+        await process_new_ads()
         await asyncio.sleep(CHECK_INTERVAL_MINUTES * 60)
 
 
