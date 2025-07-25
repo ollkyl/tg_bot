@@ -3,12 +3,9 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import LabeledPrice, InlineKeyboardMarkup, InlineKeyboardButton
 from bot.keyboards import get_subscription_keyboard, inline_kb
 from bot.states import SubscriptionState
-from db import add_subscription, check_subscription
-from .start import (
-    get_selected_text,
+from db import add_subscription
+from bot.handlers.start import (
     subscription_translations,
-    period_translations,
-    furnishing_translations,
 )
 
 
@@ -44,9 +41,9 @@ def register_subscription(dp, bot):
     async def process_subscription_choice(callback: types.CallbackQuery, state: FSMContext):
         subscription_type = callback.data
         prices = {
-            "day": [LabeledPrice(label="Подписка на день", amount=100)],
-            "week": [LabeledPrice(label="Подписка на неделю", amount=500)],
-            "month": [LabeledPrice(label="Подписка на месяц", amount=1500)],
+            "day": [LabeledPrice(label="Подписка на день", amount=20)],
+            "week": [LabeledPrice(label="Подписка на неделю", amount=50)],
+            "month": [LabeledPrice(label="Подписка на месяц", amount=200)],
         }
         data = await state.get_data()
         invoice_message_id = data.get("invoice_message_id")

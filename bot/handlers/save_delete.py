@@ -38,9 +38,14 @@ def register_save_delete(dp, bot):
         has_subscription = await check_subscription(user_id)
         if not has_subscription:
             await callback.message.answer(
-                "Для получения объявлений оформите подписку ⭐.",
+                "📢 <b>Необходима подписка для получения объявлений:</b>\n"
+                "▫️ <i>1 день</i> - <b>20</b>⭐   (40 рублей / 1.68 AED)\n"
+                "▫️ <i>неделя</i> - <b>50</b>⭐   (90 рублей / 4.2 AED)\n"
+                "▫️ <i>месяц</i> - <b>200</b>⭐   (360 рублей / 16.8 AED)\n\n",
                 reply_markup=main_menu,
+                parse_mode="HTML",
             )
+
             await callback.answer("Подписка требуется!")
             await add_client(
                 user_id,

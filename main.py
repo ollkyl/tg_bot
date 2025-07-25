@@ -89,7 +89,7 @@ async def main():
             await on_shutdown(bot)
             await runner.cleanup()
     else:
-        print("▶️ Запуск в режиме polling")
+        print("Запуск в режиме polling, для локальной разработки")
         try:
             await asyncio.gather(dp.start_polling(bot), main_parser())
         except Exception as e:

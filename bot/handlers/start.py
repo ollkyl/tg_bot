@@ -102,3 +102,45 @@ def register_start(dp, bot):
             f"Доступ к боту на {subscription_translations['day']} активирован!",
             reply_markup=inline_kb,
         )
+
+    @dp.message(F.text == "Вызвать меню")
+    async def call_menu(message: types.Message, state: FSMContext):
+        data = await state.get_data()
+
+        selected_message_id = data.get("selected_message_id")
+        subscription_message_id = data.get("subscription_message_id")
+        invoice_message_id = data.get("invoice_message_id")
+        finish_message_id = data.get("finish_message_id")
+
+        # Удаляем старое сообщение с выбранными параметрами
+        if selected_message_id:
+            try:
+                await message.bot.delete_message(
+                    chat_id=message.chat.id, message_id=selected_message_id
+                )
+            except Exception:
+                pass
+
+        # Удаляем побочные сообщения
+        for msg_id in [subscription_message_id, invoice_message_id, finish_message_id]:
+            if msg_id:
+                try:
+                    await message.bot.delete_message(chat_id=message.chat.id, message_id=msg_id)
+                except Exception:
+                    pass
+
+        # Показываем меню (важно!)
+        menu_message = await message.answer("Выберите параметры:", reply_markup=inline_kb)
+
+        # Показываем новое сообщение с параметрами
+        selected_text = get_selected_text(data)
+        params_message = await message.answer(selected_text, parse_mode="HTML")
+
+        # Обновляем состояние
+        await state.update_data(
+            menu_message_id=menu_message.message_id,
+            selected_message_id=params_message.message_id,
+            subscription_message_id=None,
+            invoice_message_id=None,
+            finish_message_id=None,
+        )

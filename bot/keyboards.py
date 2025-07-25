@@ -45,7 +45,7 @@ inline_kb = InlineKeyboardMarkup(
         [InlineKeyboardButton(text="Комнаты", callback_data="button_rooms")],
         [InlineKeyboardButton(text="Срок аренды", callback_data="button_period")],
         [InlineKeyboardButton(text="Меблировка", callback_data="button_furnishing")],
-        [InlineKeyboardButton(text="⭐ Подписка ⭐", callback_data="subscription")],
+        [InlineKeyboardButton(text="Подписка", callback_data="subscription")],
         [InlineKeyboardButton(text="❕Сохранить выбор❕", callback_data="button_save")],
         [InlineKeyboardButton(text="Отчистить всё", callback_data="button_delete")],
     ]
