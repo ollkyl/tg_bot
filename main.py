@@ -82,12 +82,16 @@ async def main():
         await runner.setup()
         site = web.TCPSite(runner, WEBAPP_HOST, WEBAPP_PORT)
 
-        await asyncio.gather(site.start(), main_parser(), on_startup(bot))
+        await site.start()
+        await on_startup(bot)
+        asyncio.create_task(main_parser())  # работает в фоне
+
         try:
             await asyncio.Event().wait()
         finally:
             await on_shutdown(bot)
             await runner.cleanup()
+
     else:
         print("Запуск в режиме polling, для локальной разработки")
         try:

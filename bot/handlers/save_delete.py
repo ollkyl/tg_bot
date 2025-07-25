@@ -19,7 +19,6 @@ def register_save_delete(dp, bot):
         districts_selected = data.get("districts", [])
         district = ", ".join(districts_selected) if districts_selected else None
         selected_rooms = data.get("count_of_rooms", [])
-        # Преобразование комнат в формат "100, 1"
         count_of_rooms = (
             ", ".join(reverse_rooms_translation.get(room, room) for room in selected_rooms)
             if selected_rooms
