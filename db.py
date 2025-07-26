@@ -167,15 +167,26 @@ async def get_all_users():
 async def add_subscription(user_id, subscription_type):
     async with async_session() as session:
         async with session.begin():
+            now = datetime.utcnow()
             duration = {
                 "day": timedelta(days=1),
                 "week": timedelta(days=7),
                 "month": timedelta(days=30),
             }[subscription_type]
+
+            # 1. Деактивируем все старые
+            await session.execute(
+                update(Subscription)
+                .where(Subscription.user_id == user_id, Subscription.status == "active")
+                .values(status="expired")
+            )
+
+            # 2. Создаём новую
             new_subscription = Subscription(
                 user_id=user_id,
                 subscription_type=subscription_type,
-                end_date=func.now() + duration,
+                start_date=now,
+                end_date=now + duration,
                 status="active",
             )
             session.add(new_subscription)

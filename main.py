@@ -11,6 +11,8 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from db import Base, DATABASE_URL
 from dotenv import load_dotenv
 from pathlib import Path
+from bot.subscription_worker import subscription_expiration_worker
+
 
 load_dotenv(dotenv_path=Path(".") / ".env")
 
@@ -84,7 +86,8 @@ async def main():
 
         await site.start()
         await on_startup(bot)
-        asyncio.create_task(main_parser())  # работает в фоне
+        asyncio.create_task(main_parser())
+        asyncio.create_task(subscription_expiration_worker())  # 🔥 Воркер по подписке
 
         try:
             await asyncio.Event().wait()
@@ -95,7 +98,11 @@ async def main():
     else:
         print("Запуск в режиме polling, для локальной разработки")
         try:
-            await asyncio.gather(dp.start_polling(bot), main_parser())
+            await asyncio.gather(
+                dp.start_polling(bot),
+                main_parser(),
+                subscription_expiration_worker(),  # 🔥 Воркер по подписке
+            )
         except Exception as e:
             print(f"Ошибка в polling или парсере: {e}")
         finally:
