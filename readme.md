@@ -8,7 +8,7 @@
 - **Уведомления**: Отправляет уведомления пользователям с активной подпиской при появлении подходящих объявлений.
 - **Проверка подписки**: Уведомления получают только пользователи с активной подпиской (`status="active)`
 
-<img src="https://github.com/user-attachments/assets/dc6a0563-2c6c-4ec9-a525-c75a0114dfe1" width="50%">
+<img src="https://github.com/user-attachments/assets/0b65b8b0-e926-4871-a2b6-1995cdac9099" width="50%">
 <img src="https://github.com/user-attachments/assets/78cccf20-021f-4011-a9ca-40041f5c9070" width="50%">
 
 
