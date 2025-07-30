@@ -34,8 +34,9 @@ def register_save_delete(dp, bot):
         user_name = data.get("user_name")
         save_count = data.get("save_count", 0)
 
-        has_subscription = await check_subscription(user_id)
-        if not has_subscription:
+        subscription = await check_subscription(user_id)
+
+        if subscription != "active":
             await callback.message.answer(
                 "📢 <b>Необходима подписка для получения объявлений:</b>\n"
                 "▫️ <i>1 день</i> - <b>20</b>⭐   (40 рублей / 1.68 AED)\n"
@@ -118,7 +119,9 @@ def register_save_delete(dp, bot):
     @dp.callback_query(F.data == "button_delete")
     async def delete_data(callback: types.CallbackQuery, state: FSMContext):
         data = await state.get_data()
+        print(f"uuuuuuuuuudata {data}")
         user_id = data.get("user_id")
+        print(f"uuuuuuuuuuid {user_id}")
         user_name = data.get("user_name")
         selected_message_id = data.get("selected_message_id")
         menu_message_id = data.get("menu_message_id")

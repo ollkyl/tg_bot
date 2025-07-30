@@ -47,7 +47,14 @@ async def update_selected_message(callback: types.CallbackQuery, state: FSMConte
 
 def get_selected_text(data):
     districts = ", ".join(data.get("districts", [])) or "Не выбрано"
-    rooms = ", ".join(data.get("count_of_rooms", [])) or "Не выбрано"
+    # Применяем перевод для комнат, используя reverse_rooms_translation
+    reverse_rooms_translation = {v: k for k, v in rooms_translation.items()}
+    rooms = (
+        ", ".join(
+            reverse_rooms_translation.get(room, room) for room in data.get("count_of_rooms", [])
+        )
+        or "Не выбрано"
+    )
     min_price = data.get("min_price", "Не выбрано")
     max_price = data.get("max_price", "Не выбрано")
     period = (
@@ -129,7 +136,7 @@ def register_start(dp, bot):
                 except Exception:
                     pass
 
-        # Показываем меню (важно!)
+        # Показываем меню
         menu_message = await message.answer("Выберите параметры:", reply_markup=inline_kb)
 
         # Показываем новое сообщение с параметрами

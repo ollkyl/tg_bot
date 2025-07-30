@@ -30,4 +30,4 @@ async def subscription_expiration_worker():
                 except Exception as e:
                     logging.error(f"Ошибка отправки уведомления {sub.user_id}: {e}")
             await session.commit()
-        await asyncio.sleep(40)  # проверка раз в час
+        await asyncio.sleep(800)

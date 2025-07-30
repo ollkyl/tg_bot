@@ -20,7 +20,7 @@ from dotenv import load_dotenv
 from pathlib import Path
 
 load_dotenv(dotenv_path=Path(".") / ".env")
-logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
+logging.getLogger("sqlalchemy.engine").setLevel(logging.CRITICAL)
 
 DB_USER = os.getenv("DB_USER")
 DB_PASS = os.getenv("DB_PASS")
@@ -29,7 +29,7 @@ DB_PORT = os.getenv("DB_PORT")
 DB_NAME = os.getenv("DB_NAME")
 DATABASE_URL = f"postgresql+asyncpg://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
-engine = create_async_engine(DATABASE_URL, echo=True)
+engine = create_async_engine(DATABASE_URL, echo=False)
 async_session = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
 Base = declarative_base()
 
@@ -83,25 +83,44 @@ async def add_client(
 ):
     async with async_session() as session:
         async with session.begin():
-            stmt_update = update(Client).where(Client.user_id == user_id).values(status="N")
-            await session.execute(stmt_update)
-            await session.flush()
+            # Проверяем, есть ли запись с user_id и status="Y"
+            query = select(Client).where(Client.user_id == user_id, Client.status == "Y")
+            result = await session.execute(query)
+            existing_client = result.scalars().first()
+
             if user_name is None:
                 user_name = "username"
-            stmt_delete = delete(Client).where(Client.status == "N")
-            await session.execute(stmt_delete)
-            new_client = Client(
-                user_id=user_id,
-                min_price=min_price,
-                max_price=max_price,
-                rooms=rooms,
-                district=district,
-                period=period,
-                furnishing=furnishing,
-                status="Y",
-                user_name=user_name,
-            )
-            session.add(new_client)
+
+            if existing_client:
+                # Обновляем существующую запись
+                await session.execute(
+                    update(Client)
+                    .where(Client.user_id == user_id, Client.status == "Y")
+                    .values(
+                        min_price=min_price,
+                        max_price=max_price,
+                        rooms=rooms,
+                        district=district,
+                        period=period,
+                        furnishing=furnishing,
+                        user_name=user_name,
+                        status="Y",
+                    )
+                )
+            else:
+                # Создаём новую запись, если нет существующей
+                new_client = Client(
+                    user_id=user_id,
+                    min_price=min_price,
+                    max_price=max_price,
+                    rooms=rooms,
+                    district=district,
+                    period=period,
+                    furnishing=furnishing,
+                    status="Y",
+                    user_name=user_name,
+                )
+                session.add(new_client)
         await session.commit()
 
 
@@ -196,10 +215,12 @@ async def add_subscription(user_id, subscription_type):
 async def check_subscription(user_id):
     async with async_session() as session:
         query = (
-            select(Subscription)
+            select(Subscription.status)
             .where(Subscription.user_id == user_id)
-            .order_by(Subscription.end_date.desc())  # сортировка самая свежая первая
+            .order_by(Subscription.end_date.desc())
             .limit(1)
         )
         result = await session.execute(query)
-        return result.scalars().first()
+        status = result.scalar()
+        print(f"check_subscription for user_id={user_id}: status={status}")
+        return status

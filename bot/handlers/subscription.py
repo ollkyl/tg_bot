@@ -87,8 +87,6 @@ def register_subscription(dp, bot):
         subscription_type = data.get("subscription_type")
         invoice_message_id = data.get("invoice_message_id")
         subscription_message_id = data.get("subscription_message_id")
-        menu_message_id = data.get("menu_message_id")
-        selected_message_id = data.get("selected_message_id")
 
         # Удаляем сообщение с ценами (подписки) и инвойс
         for msg_id in [invoice_message_id, subscription_message_id]:
@@ -97,11 +95,10 @@ def register_subscription(dp, bot):
                     await bot.delete_message(chat_id=message.chat.id, message_id=msg_id)
                 except Exception as e:
                     print(f"Ошибка удаления сообщения (ID {msg_id}): {e}")
-
+        print(f"uuuuuuuuuupricess {message.from_user.id}")
         await add_subscription(user_id=message.from_user.id, subscription_type=subscription_type)
         await state.update_data(invoice_message_id=None, subscription_message_id=None)
-        await state.clear()
-
+        print(f"uuuuuuuuuuupdate_data {state.get_data}")
         # Отправляем только сообщение об успешной оплате
         await message.answer(
             f"Оплата прошла успешно! Доступ к боту на {subscription_translations.get(subscription_type, subscription_type)} активирован!",

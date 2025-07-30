@@ -19,8 +19,7 @@ LAST_CLEANUP_FILE = "last_cleanup.txt"
 CLEANUP_INTERVAL_HOURS = 12
 CHECK_INTERVAL_MINUTES = 10
 DB_CLEANUP_DAYS = 7
-print("ALGOLIA_API_KEY =", repr(ALGOLIA_API_KEY))
-print("ALGOLIA_APP_ID =", repr(ALGOLIA_APP_ID))
+
 
 headers = {
     "X-Algolia-API-Key": ALGOLIA_API_KEY,

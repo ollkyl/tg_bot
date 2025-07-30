@@ -8,11 +8,12 @@ from bot.keyboards import (
     get_district_keyboard,
     get_furnishing_keyboard,
     inline_kb,
-    rooms,
     districts,
 )
 from bot.states import Selection
 from bot.handlers.start import update_selected_message
+
+rooms = ["студия", "1-комнатная", "2-комнатная", "3-комнатная", "4-комнатная"]
 
 
 async def return_to_main_menu(callback: types.CallbackQuery, state: FSMContext, bot):
@@ -52,11 +53,11 @@ def register_filters(dp, bot):
         selected_rooms = data.get("count_of_rooms", [])
         await callback.message.edit_text(
             "Выберите количество комнат:",
-            reply_markup=get_count_of_rooms_keyboard(rooms, selected_rooms=selected_rooms),
+            reply_markup=get_count_of_rooms_keyboard(selected_rooms=selected_rooms),
         )
         await state.set_state(Selection.choosing_count_of_rooms)
 
-    @dp.callback_query(F.data.in_(rooms))
+    @dp.callback_query(F.data.in_(["100", "1", "2", "3", "4"]))
     async def confirm_room_choice(callback: types.CallbackQuery, state: FSMContext):
         room = callback.data
         data = await state.get_data()
@@ -67,7 +68,8 @@ def register_filters(dp, bot):
             selected_rooms.append(room)
         await state.update_data(count_of_rooms=selected_rooms)
         await callback.message.edit_text(
-            "Выберите комнаты:", reply_markup=get_count_of_rooms_keyboard(rooms, selected_rooms)
+            "Выберите комнаты:",
+            reply_markup=get_count_of_rooms_keyboard(selected_rooms=selected_rooms),
         )
 
     @dp.callback_query(F.data == "room_done")

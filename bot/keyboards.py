@@ -5,6 +5,7 @@ from aiogram.types import (
     KeyboardButton,
 )
 
+
 districts = [
     "Citywalk",
     "Bluewaters",
@@ -27,8 +28,6 @@ districts = [
     "Al Barsha + Arjan",
 ]
 
-rooms = ["студия", "1-комнатная", "2-комнатная", "3-комнатная", "4-комнатная"]
-
 finish_messages = [
     "Параметры сохранены! Мы уведомим вас, как только появится подходящее объявление.",
     "Параметры обновлены. Мы сообщим вам, как только найдётся квартира по вашим критериям.",
@@ -37,6 +36,7 @@ finish_messages = [
     "Параметры успешно обновлены! Мы сообщим вам о новых подходящих объявлениях.",
     "Ваши параметры обновлены. Теперь мы ищем квартиру по актуальным настройкам и уведомим вас при появлении подходящего варианта.",
 ]
+
 
 inline_kb = InlineKeyboardMarkup(
     inline_keyboard=[
@@ -88,7 +88,7 @@ def get_max_price_keyboard(min_price):
     )
 
 
-def get_count_of_rooms_keyboard(rooms, selected_rooms):
+def get_count_of_rooms_keyboard(selected_rooms):
     options = [
         ("студия", "100"),
         ("1-комнатная", "1"),

@@ -118,8 +118,8 @@ async def send_apartment_notification(apartment_id):
                 if not user_id:
                     continue
                 # Проверка подписки
-                has_subscription = await check_subscription(user_id)
-                if not has_subscription:
+                subscription = await check_subscription(user_id)
+                if subscription != "active":
                     logging.info(f"[NOTIFY] Пропуск: пользователь {user_id} без подписки")
                     continue
                 if await send_media_group(user_id, photo_urls, message):
