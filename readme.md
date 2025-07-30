@@ -8,8 +8,9 @@
 - **Уведомления**: Отправляет уведомления пользователям с активной подпиской при появлении подходящих объявлений.
 - **Проверка подписки**: Уведомления получают только пользователи с активной подпиской (`status="active)`
 
-![222222222222222222222](https://github.com/user-attachments/assets/78cccf20-021f-4011-a9ca-40041f5c9070)
-![findapartmentsbot](https://github.com/user-attachments/assets/dc6a0563-2c6c-4ec9-a525-c75a0114dfe1)
+<img src="https://github.com/user-attachments/assets/dc6a0563-2c6c-4ec9-a525-c75a0114dfe1" width="50%">
+<img src="https://github.com/user-attachments/assets/78cccf20-021f-4011-a9ca-40041f5c9070" width="50%">
+
 
 ## Установка
 1. **Зависимости**: Установите зависимости из `requirements.txt`:
