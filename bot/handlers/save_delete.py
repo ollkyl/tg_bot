@@ -8,7 +8,6 @@ from bot.handlers.start import (
     rooms_translation,
 )
 
-# Обратный словарь для преобразования комнат в формат БД
 reverse_rooms_translation = {v: k for k, v in rooms_translation.items()}
 
 
@@ -119,9 +118,9 @@ def register_save_delete(dp, bot):
     @dp.callback_query(F.data == "button_delete")
     async def delete_data(callback: types.CallbackQuery, state: FSMContext):
         data = await state.get_data()
-        print(f"uuuuuuuuuudata {data}")
+
         user_id = data.get("user_id")
-        print(f"uuuuuuuuuuid {user_id}")
+
         user_name = data.get("user_name")
         selected_message_id = data.get("selected_message_id")
         menu_message_id = data.get("menu_message_id")

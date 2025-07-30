@@ -67,10 +67,11 @@ async def send_apartment_notification(apartment_id):
             return
 
         furnishing_translations = {
-            "furnished": "Меблированная",
-            "unfurnished": "Немеблированная",
+            True: "меблированная",
+            False: "немеблированная",
         }
         furnishing = furnishing_translations.get(apt.furnishing, apt.furnishing or "Не указано")
+
         name = apt.name
         price = apt.price
         rooms = apt.rooms
