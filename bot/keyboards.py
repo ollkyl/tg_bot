@@ -89,10 +89,17 @@ def get_max_price_keyboard(min_price):
 
 
 def get_count_of_rooms_keyboard(rooms, selected_rooms):
+    options = [
+        ("студия", "100"),
+        ("1-комнатная", "1"),
+        ("2-комнатная", "2"),
+        ("3-комнатная", "3"),
+        ("4-комнатная", "4"),
+    ]
     buttons = []
-    for room in rooms:
-        text = f"✅ {room}" if room in selected_rooms else room
-        buttons.append([InlineKeyboardButton(text=text, callback_data=room)])
+    for label, value in options:
+        text = f"✅ {label}" if value in selected_rooms else label
+        buttons.append([InlineKeyboardButton(text=text, callback_data=value)])
     buttons.append([InlineKeyboardButton(text="Готово", callback_data="room_done")])
     buttons.append([InlineKeyboardButton(text="Назад", callback_data="back")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)

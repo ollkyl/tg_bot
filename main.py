@@ -13,7 +13,6 @@ from dotenv import load_dotenv
 from pathlib import Path
 from bot.subscription_worker import subscription_expiration_worker
 
-
 load_dotenv(dotenv_path=Path(".") / ".env")
 
 API_TOKEN = os.environ["API_TOKEN"]
@@ -40,10 +39,10 @@ async def wait_for_postgres():
                 user=DB_USER, password=DB_PASS, database=DB_NAME, host=DB_HOST, port=int(DB_PORT)
             )
             await conn.close()
-            print("✅ PostgreSQL доступен!")
+            logging.info("✅ PostgreSQL доступен!")
             return
         except Exception as e:
-            print(f"⏳ Ожидание PostgreSQL: {e}")
+            logging.error(f"⏳ Ожидание PostgreSQL: {e}")
             await asyncio.sleep(2)
 
 
@@ -56,15 +55,16 @@ async def init_db():
 
 async def on_startup(bot: Bot):
     await bot.set_webhook(WEBHOOK_URL)
-    print(f"Webhook установлен: {WEBHOOK_URL}")
+    logging.info(f"Webhook установлен: {WEBHOOK_URL}")
 
 
 async def on_shutdown(bot: Bot):
     await bot.delete_webhook()
-    print("Webhook удален")
+    logging.info("Webhook удален")
 
 
 async def main():
+    logging.basicConfig(level=logging.INFO)
     await wait_for_postgres()
     await init_db()
 
@@ -86,29 +86,42 @@ async def main():
 
         await site.start()
         await on_startup(bot)
+
+        # Запускаем парсер и воркер как фоновые задачи
         asyncio.create_task(main_parser())
-        asyncio.create_task(subscription_expiration_worker())  # 🔥 Воркер по подписке
+        asyncio.create_task(subscription_expiration_worker())
 
         try:
-            await asyncio.Event().wait()
+            await asyncio.Event().wait()  # Основной цикл для webhook
         finally:
             await on_shutdown(bot)
             await runner.cleanup()
 
     else:
-        print("Запуск в режиме polling, для локальной разработки")
+        await bot.delete_webhook()
+        logging.info("Webhook удалён для запуска polling")
+        logging.info("Запуск в режиме polling, для локальной разработки")
         try:
+            # Запускаем polling в основном цикле для приоритета
             await asyncio.gather(
-                dp.start_polling(bot),
-                main_parser(),
-                subscription_expiration_worker(),  # 🔥 Воркер по подписке
+                dp.start_polling(bot),  # Бот в приоритете
+                background_task(main_parser),  # Парсер с задержкой
+                background_task(subscription_expiration_worker),  # Воркер с задержкой
             )
         except Exception as e:
-            print(f"Ошибка в polling или парсере: {e}")
+            logging.error(f"Ошибка в polling или задачах: {e}")
         finally:
             await bot.session.close()
 
 
+async def background_task(coro):
+    """Обёртка для фоновых задач с меньшим приоритетом"""
+    await asyncio.sleep(1)  # Даём боту запуститься первым
+    try:
+        await coro()
+    except Exception as e:
+        logging.error(f"Ошибка в фоновой задаче {coro.__name__}: {e}")
+
+
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
     asyncio.run(main())

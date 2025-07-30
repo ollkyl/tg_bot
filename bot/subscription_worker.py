@@ -11,6 +11,7 @@ bot = Bot(token=os.getenv("API_TOKEN"))
 
 async def subscription_expiration_worker():
     while True:
+        print("subscription_expiration_worker")
         async with async_session() as session:
             now = datetime.utcnow()
             result = await session.execute(
@@ -29,4 +30,4 @@ async def subscription_expiration_worker():
                 except Exception as e:
                     logging.error(f"Ошибка отправки уведомления {sub.user_id}: {e}")
             await session.commit()
-        await asyncio.sleep(3600)  # проверка раз в час
+        await asyncio.sleep(40)  # проверка раз в час

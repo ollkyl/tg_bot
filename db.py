@@ -195,11 +195,11 @@ async def add_subscription(user_id, subscription_type):
 
 async def check_subscription(user_id):
     async with async_session() as session:
-        query = select(Subscription).where(
-            (Subscription.user_id == user_id)
-            & (Subscription.status == "active")
-            & (Subscription.end_date >= func.now())
+        query = (
+            select(Subscription)
+            .where(Subscription.user_id == user_id)
+            .order_by(Subscription.end_date.desc())  # сортировка самая свежая первая
+            .limit(1)
         )
         result = await session.execute(query)
-        subscription = result.scalars().first()
-        return subscription is not None
+        return result.scalars().first()

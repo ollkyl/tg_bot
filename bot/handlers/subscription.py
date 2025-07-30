@@ -85,18 +85,24 @@ def register_subscription(dp, bot):
     async def process_successful_payment(message: types.Message, state: FSMContext):
         data = await state.get_data()
         subscription_type = data.get("subscription_type")
-        menu_message_id = data.get("menu_message_id")
         invoice_message_id = data.get("invoice_message_id")
-        if invoice_message_id:
-            try:
-                await bot.delete_message(chat_id=message.chat.id, message_id=invoice_message_id)
-            except Exception as e:
-                print(f"Ошибка удаления инвойса: {e}")
-        await add_subscription(user_id=message.from_user.id, subscription_type=subscription_type)
+        subscription_message_id = data.get("subscription_message_id")
+        menu_message_id = data.get("menu_message_id")
+        selected_message_id = data.get("selected_message_id")
 
-        await state.update_data(invoice_message_id=None)
+        # Удаляем сообщение с ценами (подписки) и инвойс
+        for msg_id in [invoice_message_id, subscription_message_id]:
+            if msg_id:
+                try:
+                    await bot.delete_message(chat_id=message.chat.id, message_id=msg_id)
+                except Exception as e:
+                    print(f"Ошибка удаления сообщения (ID {msg_id}): {e}")
+
+        await add_subscription(user_id=message.from_user.id, subscription_type=subscription_type)
+        await state.update_data(invoice_message_id=None, subscription_message_id=None)
         await state.clear()
+
+        # Отправляем только сообщение об успешной оплате
         await message.answer(
             f"Оплата прошла успешно! Доступ к боту на {subscription_translations.get(subscription_type, subscription_type)} активирован!",
-            reply_markup=inline_kb,
         )

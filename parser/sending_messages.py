@@ -86,7 +86,7 @@ async def send_apartment_notification(apartment_id):
             period = "от года"
         else:
             period = "Не указано"
-        furnishing = furnishing
+
         info = apt.info or "Не указаны удобства"
         link = apt.link
         owner = apt.owner.replace(" ", "_")
