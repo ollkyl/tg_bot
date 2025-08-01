@@ -35,114 +35,67 @@
 
 ```mermaid
 graph TD
-    7["User<br>External Actor"]
-    subgraph 1["Project Configuration & Deployment<br>Various"]
-        25["Dependency Management<br>Text"]
-        26["Deployment Config<br>YAML"]
-        27[".gitignore<br>Text"]
-        28["Project Documentation<br>Markdown"]
-        subgraph 2["Docker Configuration"]
-            22["Dockerfile<br>Dockerfile"]
-            23["Docker Compose<br>YAML"]
-            24[".dockerignore<br>Text"]
+    %% Основные узлы
+    User["User<br>External Actor"]
+    
+    subgraph "Project Configuration & Deployment<br>Various"
+        subgraph "Docker Configuration"
+            Dockerfile["Dockerfile<br>Dockerfile"]
+            DockerCompose["Docker Compose<br>YAML"]
+            DockerIgnore[".dockerignore<br>Text"]
         end
+        Deps["Dependency Management<br>Text"]
+        DeployConfig["Deployment Config<br>YAML"]
+        GitIgnore[".gitignore<br>Text"]
+        Docs["Project Documentation<br>Markdown"]
     end
-    subgraph 3["Database System<br>PostgreSQL, SQLAlchemy"]
-        20["DB Connection & Operations<br>Python"]
-        21["Table Creation<br>Python"]
-        20 -->|Initializes| 21
+    
+    subgraph "Database System<br>PostgreSQL, SQLAlchemy"
+        DB["DB Connection & Operations<br>Python"]
+        Tables["Table Creation<br>Python"]
+        DB --> Tables
     end
-    subgraph 4["Data Parser System<br>Python"]
-        17["Main Parser Logic<br>Python"]
-        18["Message Sending Component<br>Python"]
-        19["Districts Data<br>JSON"]
-        17 -->|Sends via| 18
-        17 -->|Uses| 19
+    
+    subgraph "Data Parser System<br>Python"
+        Parser["Main Parser Logic<br>Python"]
+        Sender["Message Sending Component<br>Python"]
+        Districts["Districts Data<br>JSON"]
+        Parser --> Sender
+        Parser --> Districts
     end
-    subgraph 5["Telegram Bot System<br>Python, aiogram"]
-        14["Bot Keyboards<br>Python"]
-        15["Bot States<br>Python"]
-        16["Subscription Worker<br>Python"]
-        8["Bot Core & Entry Point<br>Python"]
-        subgraph 6["Bot Handlers"]
-            10["Subscription Handler<br>Python"]
-            11["Broadcast Handler<br>Python"]
-            12["Save/Delete Handler<br>Python"]
-            13["Filters<br>Python"]
-            9["Start Handler<br>Python"]
+    
+    subgraph "Telegram Bot System<br>Python, aiogram"
+        subgraph "Bot Handlers"
+            Start["Start Handler<br>Python"]
+            Sub["Subscription Handler<br>Python"]
+            Broadcast["Broadcast Handler<br>Python"]
+            Save["Save/Delete Handler<br>Python"]
+            Filters["Filters<br>Python"]
         end
-        8 -->|Registers| 6
-        8 -->|Uses| 14
-        8 -->|Manages| 15
-        8 -->|Starts| 16
-        6 -->|Uses| 14
-        6 -->|Manages| 15
+        
+        Core["Bot Core & Entry Point<br>Python"]
+        Keyboards["Bot Keyboards<br>Python"]
+        States["Bot States<br>Python"]
+        Worker["Subscription Worker<br>Python"]
+        
+        Core --> Start
+        Core --> Sub
+        Core --> Broadcast
+        Core --> Save
+        Core --> Filters
+        Core --> Keyboards
+        Core --> States
+        Core --> Worker
     end
-    3 -->|Deployed with| 1
-    4 -->|Deployed with| 1
-    4 -->|Stores data in| 3
-    4 -->|Sends messages via| 5
-    5 -->|Deployed with| 1
-    5 -->|Uses| 3
-    5 -->|Triggers| 4
-    16 -->|Accesses| 3
-    7 -->|Interacts with| 5
-
-graph TD
-
-    7["User<br>External Actor"]
-    subgraph 1["Project Configuration &amp; Deployment<br>Various"]
-        25["Dependency Management<br>Text"]
-        26["Deployment Config<br>YAML"]
-        27[".gitignore<br>Text"]
-        28["Project Documentation<br>Markdown"]
-        subgraph 2["Docker Configuration"]
-            22["Dockerfile<br>Dockerfile"]
-            23["Docker Compose<br>YAML"]
-            24[".dockerignore<br>Text"]
-        end
-    end
-    subgraph 3["Database System<br>SQLite, SQLAlchemy"]
-        20["DB Connection &amp; Operations<br>Python"]
-        21["Table Creation<br>Python"]
-        %% Edges at this level (grouped by source)
-        20["DB Connection &amp; Operations<br>Python"] -->|Initializes| 21["Table Creation<br>Python"]
-    end
-    subgraph 4["Data Parser System<br>Python"]
-        17["Main Parser Logic<br>Python"]
-        18["Message Sending Component<br>Python"]
-        19["Districts Data<br>JSON"]
-        %% Edges at this level (grouped by source)
-        17["Main Parser Logic<br>Python"] -->|Sends via| 18["Message Sending Component<br>Python"]
-        17["Main Parser Logic<br>Python"] -->|Uses| 19["Districts Data<br>JSON"]
-    end
-    subgraph 5["Telegram Bot System<br>Python, aiogram"]
-        14["Bot Keyboards<br>Python"]
-        15["Bot States<br>Python"]
-        16["Subscription Worker<br>Python"]
-        8["Bot Core &amp; Entry Point<br>Python"]
-        subgraph 6["Bot Handlers"]
-            10["Subscription Handler<br>Python"]
-            11["Broadcast Handler<br>Python"]
-            12["Save/Delete Handler<br>Python"]
-            13["Filters<br>Python"]
-            9["Start Handler<br>Python"]
-        end
-        %% Edges at this level (grouped by source)
-        8["Bot Core &amp; Entry Point<br>Python"] -->|Registers| 6["Bot Handlers"]
-        8["Bot Core &amp; Entry Point<br>Python"] -->|Uses| 14["Bot Keyboards<br>Python"]
-        8["Bot Core &amp; Entry Point<br>Python"] -->|Manages| 15["Bot States<br>Python"]
-        8["Bot Core &amp; Entry Point<br>Python"] -->|Starts| 16["Subscription Worker<br>Python"]
-        6["Bot Handlers"] -->|Uses| 14["Bot Keyboards<br>Python"]
-        6["Bot Handlers"] -->|Manages| 15["Bot States<br>Python"]
-    end
-    %% Edges at this level (grouped by source)
-    3["Database System<br>SQLite, SQLAlchemy"] -->|Deployed with| 1["Project Configuration &amp; Deployment<br>Various"]
-    4["Data Parser System<br>Python"] -->|Deployed with| 1["Project Configuration &amp; Deployment<br>Various"]
-    4["Data Parser System<br>Python"] -->|Stores data in| 3["Database System<br>SQLite, SQLAlchemy"]
-    4["Data Parser System<br>Python"] -->|Sends messages via| 5["Telegram Bot System<br>Python, aiogram"]
-    5["Telegram Bot System<br>Python, aiogram"] -->|Deployed with| 1["Project Configuration &amp; Deployment<br>Various"]
-    5["Telegram Bot System<br>Python, aiogram"] -->|Uses| 3["Database System<br>SQLite, SQLAlchemy"]
-    5["Telegram Bot System<br>Python, aiogram"] -->|Triggers| 4["Data Parser System<br>Python"]
-    16["Subscription Worker<br>Python"] -->|Accesses| 3["Database System<br>SQLite, SQLAlchemy"]
-    7["User<br>External Actor"] -->|Interacts with| 5["Telegram Bot System<br>Python, aiogram"]
+    
+    %% Связи между компонентами
+    User --> Core
+    
+    "Database System<br>PostgreSQL, SQLAlchemy" -->|Deployed with| "Project Configuration & Deployment<br>Various"
+    "Data Parser System<br>Python" -->|Deployed with| "Project Configuration & Deployment<br>Various"
+    "Data Parser System<br>Python" -->|Stores data in| "Database System<br>PostgreSQL, SQLAlchemy"
+    "Data Parser System<br>Python" -->|Sends messages via| "Telegram Bot System<br>Python, aiogram"
+    "Telegram Bot System<br>Python, aiogram" -->|Deployed with| "Project Configuration & Deployment<br>Various"
+    "Telegram Bot System<br>Python, aiogram" -->|Uses| "Database System<br>PostgreSQL, SQLAlchemy"
+    "Telegram Bot System<br>Python, aiogram" -->|Triggers| "Data Parser System<br>Python"
+    Worker -->|Accesses| "Database System<br>PostgreSQL, SQLAlchemy"
