@@ -6,11 +6,10 @@
 - **Интерактивность**: Пользователи выбирают параметры через инлайн-клавиатуры и сохраняют их в базу данных PostgreSQL.
 - **Сбор данных**: Бот парсит объявления о квартирах с Bayut.com, сохраняя цену, комнаты, район и фото.
 - **Уведомления**: Отправляет уведомления пользователям с активной подпиской при появлении подходящих объявлений.
-- **Проверка подписки**: Уведомления получают только пользователи с активной подпиской (`status="active)`
+- **Проверка подписки**: Уведомления получают только пользователи с активной подпиской (`status="active)`.
 
 <img src="https://github.com/user-attachments/assets/0b65b8b0-e926-4871-a2b6-1995cdac9099" width="40%">
 <img src="https://github.com/user-attachments/assets/78cccf20-021f-4011-a9ca-40041f5c9070" width="40%">
-
 
 ## Установка
 1. **Зависимости**: Установите зависимости из `requirements.txt`:
@@ -30,72 +29,62 @@
 3. Сохраните параметры кнопкой "Сохранить". Убедитесь, что подписка активна.
 4. Получайте уведомления о подходящих квартирах при активной подписке.
 
-
 ## Архитектура проекта
 
 ```mermaid
 graph TD
-    %% Основные узлы
-    User["User<br>External Actor"]
-    
-    subgraph "Project Configuration & Deployment<br>Various"
-        subgraph "Docker Configuration"
-            Dockerfile["Dockerfile<br>Dockerfile"]
-            DockerCompose["Docker Compose<br>YAML"]
-            DockerIgnore[".dockerignore<br>Text"]
+
+    7["User<br>External Actor"]
+    subgraph 1["Project Configuration & Deployment<br>Various"]
+        25["Dependency Management<br>Text"]
+        26["Deployment Config<br>YAML"]
+        27[".gitignore<br>Text"]
+        28["Project Documentation<br>Markdown"]
+        subgraph 2["Docker Configuration"]
+            22["Dockerfile<br>Dockerfile"]
+            23["Docker Compose<br>YAML"]
+            24[".dockerignore<br>Text"]
         end
-        Deps["Dependency Management<br>Text"]
-        DeployConfig["Deployment Config<br>YAML"]
-        GitIgnore[".gitignore<br>Text"]
-        Docs["Project Documentation<br>Markdown"]
     end
-    
-    subgraph "Database System<br>PostgreSQL, SQLAlchemy"
-        DB["DB Connection & Operations<br>Python"]
-        Tables["Table Creation<br>Python"]
-        DB --> Tables
+    subgraph 3["Database System<br>SQLite, SQLAlchemy"]
+        20["DB Connection & Operations<br>Python"]
+        21["Table Creation<br>Python"]
+        20 -->|Initializes| 21
     end
-    
-    subgraph "Data Parser System<br>Python"
-        Parser["Main Parser Logic<br>Python"]
-        Sender["Message Sending Component<br>Python"]
-        Districts["Districts Data<br>JSON"]
-        Parser --> Sender
-        Parser --> Districts
+    subgraph 4["Data Parser System<br>Python"]
+        17["Main Parser Logic<br>Python"]
+        18["Message Sending Component<br>Python"]
+        19["Districts Data<br>JSON"]
+        17 -->|Sends via| 18
+        17 -->|Uses| 19
     end
-    
-    subgraph "Telegram Bot System<br>Python, aiogram"
-        subgraph "Bot Handlers"
-            Start["Start Handler<br>Python"]
-            Sub["Subscription Handler<br>Python"]
-            Broadcast["Broadcast Handler<br>Python"]
-            Save["Save/Delete Handler<br>Python"]
-            Filters["Filters<br>Python"]
+    subgraph 5["Telegram Bot System<br>Python, aiogram"]
+        14["Bot Keyboards<br>Python"]
+        15["Bot States<br>Python"]
+        16["Subscription Worker<br>Python"]
+        8["Bot Core & Entry Point<br>Python"]
+        subgraph 6["Bot Handlers"]
+            10["Subscription Handler<br>Python"]
+            11["Broadcast Handler<br>Python"]
+            12["Save/Delete Handler<br>Python"]
+            13["Filters<br>Python"]
+            9["Start Handler<br>Python"]
         end
-        
-        Core["Bot Core & Entry Point<br>Python"]
-        Keyboards["Bot Keyboards<br>Python"]
-        States["Bot States<br>Python"]
-        Worker["Subscription Worker<br>Python"]
-        
-        Core --> Start
-        Core --> Sub
-        Core --> Broadcast
-        Core --> Save
-        Core --> Filters
-        Core --> Keyboards
-        Core --> States
-        Core --> Worker
+        8 -->|Registers| 6
+        8 -->|Uses| 14
+        8 -->|Manages| 15
+        8 -->|Starts| 16
+        6 -->|Uses| 14
+        6 -->|Manages| 15
     end
-    
-    %% Связи между компонентами
-    User --> Core
-    
-    "Database System<br>PostgreSQL, SQLAlchemy" -->|Deployed with| "Project Configuration & Deployment<br>Various"
-    "Data Parser System<br>Python" -->|Deployed with| "Project Configuration & Deployment<br>Various"
-    "Data Parser System<br>Python" -->|Stores data in| "Database System<br>PostgreSQL, SQLAlchemy"
-    "Data Parser System<br>Python" -->|Sends messages via| "Telegram Bot System<br>Python, aiogram"
-    "Telegram Bot System<br>Python, aiogram" -->|Deployed with| "Project Configuration & Deployment<br>Various"
-    "Telegram Bot System<br>Python, aiogram" -->|Uses| "Database System<br>PostgreSQL, SQLAlchemy"
-    "Telegram Bot System<br>Python, aiogram" -->|Triggers| "Data Parser System<br>Python"
-    Worker -->|Accesses| "Database System<br>PostgreSQL, SQLAlchemy"
+    3 -->|Deployed with| 1
+    4 -->|Deployed with| 1
+    4 -->|Stores data in| 3
+    4 -->|Sends messages via| 5
+    5 -->|Deployed with| 1
+    5 -->|Uses| 3
+    5 -->|Triggers| 4
+    16 -->|Accesses| 3
+    7 -->|Interacts with| 5
+```
+
