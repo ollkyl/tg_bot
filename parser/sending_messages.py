@@ -99,12 +99,13 @@ async def send_apartment_notification(apartment_id):
             f"📍 Район: {district}\n"
             f"⌛ Период: {period}\n"
             f"🪑 {furnishing}\n"
-            f"ℹ️ Удобства: {info}\n"
+            f"ℹ️ Удобства: {info[:300] + '...' if len(info) > 300 else info}\n"
             f"🔗 <a href='{link}'>Ссылка на объявление</a>\n"
             f"📞 {owner}"
         )
 
         channel_id = "@apartDubaiApart"
+        channel_ad_id = "-1002628586690"
         photo_urls = get_photo_urls(apt.photo_ids)
 
         # Отправка в канал
@@ -128,8 +129,8 @@ async def send_apartment_notification(apartment_id):
             if sent_usernames:
                 try:
                     await bot.send_message(
-                        chat_id=channel_id,
-                        text=f"Сообщения отправлены: {', '.join(sent_usernames)}",
+                        chat_id=channel_ad_id,
+                        text=f"Для apartment_id={apartment_id} сообщения отправлены: {', '.join(sent_usernames)}",
                         parse_mode="HTML",
                     )
                     logging.info(
