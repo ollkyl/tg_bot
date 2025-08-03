@@ -23,7 +23,38 @@ rooms_translation = {
     "4-комнатная": "4",
 }
 
-subscription_translations = {"day": "день", "week": "неделю", "month": "месяц"}
+subscription_translations = {
+    "day": "день",
+    "week": "неделю",
+    "month": "месяц",
+}
+
+
+def get_selected_text(data):
+    districts = ", ".join(data.get("districts", [])) or "Не выбрано"
+    reverse_rooms_translation = {v: k for k, v in rooms_translation.items()}
+    rooms = (
+        ", ".join(reverse_rooms_translation.get(r, r) for r in data.get("count_of_rooms", []))
+        or "Не выбрано"
+    )
+    min_price = data.get("min_price", "Не выбрано")
+    max_price = data.get("max_price", "Не выбрано")
+    period = (
+        ", ".join(period_translations.get(p, p) for p in data.get("periods", [])) or "Не выбрано"
+    )
+    furnishing = (
+        ", ".join(furnishing_translations.get(f, f) for f in data.get("furnishing", []))
+        or "Не выбрано"
+    )
+
+    return (
+        f"Выбраные параметры:\n"
+        f"<code>🏠 Районы:</code> <b>{districts}</b>\n"
+        f"<code>💰 Диапазон цены:</code> <b>{min_price} - {max_price} AED в месяц</b>\n"
+        f"<code>🛏 Комнаты:</code> <b>{rooms}</b>\n"
+        f"<code>📆 Срок аренды:</code> <b>{period}</b>\n"
+        f"<code>🪑 Меблировка:</code> <b>{furnishing}</b>"
+    )
 
 
 async def update_selected_message(callback: types.CallbackQuery, state: FSMContext, bot):
@@ -39,39 +70,10 @@ async def update_selected_message(callback: types.CallbackQuery, state: FSMConte
                 parse_mode="HTML",
             )
         else:
-            params_message = await callback.message.answer(selected_text, parse_mode="HTML")
-            await state.update_data(selected_message_id=params_message.message_id)
+            msg = await callback.message.answer(selected_text, parse_mode="HTML")
+            await state.update_data(selected_message_id=msg.message_id)
     except Exception:
         print("Ошибка при обновлении сообщения с выбранными параметрами.")
-
-
-def get_selected_text(data):
-    districts = ", ".join(data.get("districts", [])) or "Не выбрано"
-    # Применяем перевод для комнат, используя reverse_rooms_translation
-    reverse_rooms_translation = {v: k for k, v in rooms_translation.items()}
-    rooms = (
-        ", ".join(
-            reverse_rooms_translation.get(room, room) for room in data.get("count_of_rooms", [])
-        )
-        or "Не выбрано"
-    )
-    min_price = data.get("min_price", "Не выбрано")
-    max_price = data.get("max_price", "Не выбрано")
-    period = (
-        ", ".join(period_translations.get(p, p) for p in data.get("periods", [])) or "Не выбрано"
-    )
-    furnishing = (
-        ", ".join(furnishing_translations.get(f, f) for f in data.get("furnishing", []))
-        or "Не выбрано"
-    )
-    return (
-        f"Выбраные параметры:\n"
-        f"<code>🏠 Районы:</code> <b>{districts}</b>\n"
-        f"<code>💰 Диапазон цены:</code> <b>{min_price} - {max_price} AED в месяц</b>\n"
-        f"<code>🛏 Комнаты:</code> <b>{rooms}</b>\n"
-        f"<code>📆 Срок аренды:</code> <b>{period}</b>\n"
-        f"<code>🪑 Меблировка:</code> <b>{furnishing}</b>"
-    )
 
 
 def register_start(dp, bot):
@@ -80,7 +82,9 @@ def register_start(dp, bot):
         await state.clear()
         user_id = message.from_user.id
         user_name = message.from_user.username
-        await state.update_data(user_id=user_id, user_name=user_name)
+
+        await state.update_data(user_id=user_id, user_name=user_name, save_count=0)
+
         await message.answer(
             "👋 Добро пожаловать! Я — ваш помощник по аренде квартир в Дубае.\n\n"
             "📢 Все новые объявления появляются в нашем канале: t.me/apartDubaiApart .\n\n"
@@ -91,11 +95,16 @@ def register_start(dp, bot):
         menu_message = await message.answer("Выберите параметры:", reply_markup=inline_kb)
         selected_text = get_selected_text({})
         params_message = await message.answer(selected_text, parse_mode="HTML")
+
         await state.update_data(
             menu_message_id=menu_message.message_id,
             selected_message_id=params_message.message_id,
             selected_text=selected_text,
+            current_menu_text="Выберите параметры:",
         )
+
+        data = await state.get_data()
+        print(f"🔍 FSM: {await state.get_state()} | DATA: { {k: v for k, v in data.items()} }")
 
     @dp.message(Command("cancel"))
     async def cmd_cancel(message: types.Message, state: FSMContext):
@@ -115,41 +124,40 @@ def register_start(dp, bot):
     @dp.message(F.text == "Вызвать меню")
     async def call_menu(message: types.Message, state: FSMContext):
         data = await state.get_data()
+        print(f"🔍 FSM: {await state.get_state()} | DATA: { {k: v for k, v in data.items()} }")
 
-        selected_message_id = data.get("selected_message_id")
-        subscription_message_id = data.get("subscription_message_id")
-        invoice_message_id = data.get("invoice_message_id")
-        finish_message_id = data.get("finish_message_id")
-
-        # Удаляем старое сообщение с выбранными параметрами
-        if selected_message_id:
-            try:
-                await message.bot.delete_message(
-                    chat_id=message.chat.id, message_id=selected_message_id
-                )
-            except Exception:
-                pass
-
-        # Удаляем побочные сообщения
-        for msg_id in [subscription_message_id, invoice_message_id, finish_message_id]:
+        # Удаляем старые сообщения
+        for msg_key in [
+            "selected_message_id",
+            "subscription_message_id",
+            "invoice_message_id",
+            "finish_message_id",
+        ]:
+            msg_id = data.get(msg_key)
             if msg_id:
                 try:
                     await message.bot.delete_message(chat_id=message.chat.id, message_id=msg_id)
                 except Exception:
                     pass
 
-        # Показываем меню
-        menu_message = await message.answer("Выберите параметры:", reply_markup=inline_kb)
+        # Обновляем параметры, если вдруг они не заданы
+        user_id = data.get("user_id") or message.from_user.id
+        user_name = data.get("user_name") or message.from_user.username
 
-        # Показываем новое сообщение с параметрами
+        # Показываем меню и параметры
+        menu_message = await message.answer("Выберите параметры:", reply_markup=inline_kb)
         selected_text = get_selected_text(data)
         params_message = await message.answer(selected_text, parse_mode="HTML")
 
         # Обновляем состояние
         await state.update_data(
+            user_id=user_id,
+            user_name=user_name,
             menu_message_id=menu_message.message_id,
             selected_message_id=params_message.message_id,
+            selected_text=selected_text,
             subscription_message_id=None,
             invoice_message_id=None,
             finish_message_id=None,
+            current_menu_text="Выберите параметры:",
         )
