@@ -79,17 +79,11 @@ async def main():
         webhook_handler = SimpleRequestHandler(dispatcher=dp, bot=bot)
         webhook_handler.register(app, path=WEBHOOK_PATH)
 
-        # Обработчик для корневого пути GET
         async def root(request):
             return web.json_response({"status": "ok"})
 
-        app.router.add_get("/", root)
-
-        # Обработчик для корневого пути HEAD
-        async def head_root(request):
-            return web.json_response({"status": "ok"})
-
-        app.router.add_head("/", head_root)
+        app.router.add_route("GET", "/", root)
+        app.router.add_route("HEAD", "/", root)
 
         setup_application(app, dp, bot=bot)
         runner = web.AppRunner(app)
