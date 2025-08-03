@@ -12,7 +12,6 @@ from db import Base, DATABASE_URL
 from dotenv import load_dotenv
 from pathlib import Path
 from bot.subscription_worker import subscription_expiration_worker
-from fastapi import FastAPI
 
 load_dotenv(dotenv_path=Path(".") / ".env")
 
@@ -76,23 +75,26 @@ async def main():
     use_webhook = os.environ.get("USE_WEBHOOK", "False").lower() == "true"
 
     if use_webhook:
-        app = FastAPI()  # Замените web.Application на FastAPI
+        app = web.Application()
         webhook_handler = SimpleRequestHandler(dispatcher=dp, bot=bot)
         webhook_handler.register(app, path=WEBHOOK_PATH)
 
-        @app.get("/")
-        async def root():
-            return {"status": "ok"}
+        # Обработчик для корневого пути GET
+        async def root(request):
+            return web.json_response({"status": "ok"})
 
-        @app.head("/")  # Добавьте обработчик HEAD-запросов
-        async def head_root():
-            return {"status": "ok"}
+        app.router.add_get("/", root)
+
+        # Обработчик для корневого пути HEAD
+        async def head_root(request):
+            return web.json_response({"status": "ok"})
+
+        app.router.add_head("/", head_root)
 
         setup_application(app, dp, bot=bot)
         runner = web.AppRunner(app)
         await runner.setup()
         site = web.TCPSite(runner, WEBAPP_HOST, WEBAPP_PORT)
-
         await site.start()
         await on_startup(bot)
 
