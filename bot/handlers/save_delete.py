@@ -17,12 +17,8 @@ def register_save_delete(dp, bot):
         data = await state.get_data()
         districts_selected = data.get("districts", [])
         district = ", ".join(districts_selected) if districts_selected else None
-        selected_rooms = data.get("count_of_rooms", [])
-        count_of_rooms = (
-            ", ".join(reverse_rooms_translation.get(room, room) for room in selected_rooms)
-            if selected_rooms
-            else None
-        )
+
+        count_of_rooms = data.get("count_of_rooms", [])
         min_price = data.get("min_price", 0)
         max_price = data.get("max_price", 1000000)
         periods = data.get("periods", [])
