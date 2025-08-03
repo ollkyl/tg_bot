@@ -81,6 +81,12 @@ class Subscription(Base):
 async def add_client(
     user_id, min_price, max_price, rooms, district, period, user_name, furnishing=None
 ):
+    # Преобразуем rooms в строку, если это список
+    if isinstance(rooms, list):
+        rooms = ", ".join(rooms) if rooms else None
+    elif rooms is not None and not isinstance(rooms, str):
+        raise ValueError("Параметр 'rooms' должен быть строкой или списком строк")
+
     async with async_session() as session:
         async with session.begin():
             # Проверяем, есть ли запись с user_id и status="Y"
