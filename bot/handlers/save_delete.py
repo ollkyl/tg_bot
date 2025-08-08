@@ -2,7 +2,7 @@ from aiogram import types, F
 from aiogram.fsm.context import FSMContext
 from aiogram.exceptions import AiogramError
 from bot.keyboards import inline_kb, main_menu, finish_messages
-from db import add_client, check_subscription
+from db import add_client, check_subscription, add_subscription
 from bot.handlers.start import (
     get_selected_text,
     rooms_translation,
@@ -31,7 +31,14 @@ def register_save_delete(dp, bot):
 
         subscription = await check_subscription(user_id)
 
-        if subscription != "active":
+        if subscription is None:
+            await add_subscription(user_id=user_id, subscription_type="day")
+            await callback.message.answer(
+                "📢ДЕЙСТВУЕТ ПРОБНАЯ ПОДПИСКА НА 1 ДЕНЬ",
+                reply_markup=main_menu,
+                parse_mode="HTML",
+            )
+        elif subscription == "execute":
             await callback.message.answer(
                 "📢 <b>Необходима подписка для получения объявлений:</b>\n"
                 "▫️ <i>1 день</i> - <b>20</b>⭐   (40 рублей / 1.68 AED)\n"
