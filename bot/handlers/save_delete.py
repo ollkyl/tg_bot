@@ -1,3 +1,4 @@
+import logging
 from aiogram import types, F
 from aiogram.fsm.context import FSMContext
 from aiogram.exceptions import AiogramError
@@ -7,6 +8,8 @@ from bot.handlers.start import (
     get_selected_text,
     rooms_translation,
 )
+
+logging.basicConfig(level=logging.DEBUG)
 
 reverse_rooms_translation = {v: k for k, v in rooms_translation.items()}
 
@@ -28,38 +31,33 @@ def register_save_delete(dp, bot):
         user_name = data.get("user_name")
         save_count = data.get("save_count", 0)
 
+        logging.debug(f"Starting save_data for user_id={user_id}")
+
         subscription = await check_subscription(user_id)
-        print(f"DEBUG subscription={subscription}, user_id={user_id}")
+        logging.debug(f"Checked subscription: {subscription} for user_id={user_id}")
+
+        await add_client(
+            user_id,
+            min_price,
+            max_price,
+            count_of_rooms,
+            district,
+            period,
+            user_name,
+            furnishing,
+        )
+        logging.debug(f"Added client data for user_id={user_id}")
 
         if subscription is None:
             await add_subscription(user_id=user_id, subscription_type="day")
-            await add_client(
-                user_id,
-                min_price,
-                max_price,
-                count_of_rooms,
-                district,
-                period,
-                user_name,
-                furnishing,
-            )
+            logging.debug(f"Added trial subscription for user_id={user_id}")
             await callback.message.answer(
                 "📢 ДЕЙСТВУЕТ ПРОБНАЯ ПОДПИСКА НА 1 ДЕНЬ",
                 reply_markup=main_menu,
                 parse_mode="HTML",
             )
             await callback.answer("Данные сохранены!")
-        elif subscription == "execute":
-            await add_client(
-                user_id,
-                min_price,
-                max_price,
-                count_of_rooms,
-                district,
-                period,
-                user_name,
-                furnishing,
-            )
+        elif subscription == "expired":
             await callback.message.answer(
                 "📢 <b>Необходима подписка для получения объявлений:</b>\n"
                 "▫️ <i>1 день</i> - <b>20</b>⭐   (40 рублей / 1.68 AED)\n"
@@ -69,20 +67,44 @@ def register_save_delete(dp, bot):
                 parse_mode="HTML",
             )
             await callback.answer("Сохранено, но подписка не активна.")
-        elif subscription == "active":
-            await add_client(
-                user_id,
-                min_price,
-                max_price,
-                count_of_rooms,
-                district,
-                period,
-                user_name,
-                furnishing,
-            )
-            await callback.answer("Данные сохранены!")
+            logging.debug(f"Handled expired subscription for user_id={user_id}")
+            # Обновление selected_text без finish_message
+            selected_text = get_selected_text(data)
+            selected_message_id = data.get("selected_message_id")
+            try:
+                if selected_message_id:
+                    await bot.edit_message_text(
+                        text=selected_text,
+                        chat_id=callback.message.chat.id,
+                        message_id=selected_message_id,
+                        parse_mode="HTML",
+                    )
+                else:
+                    sent_message = await callback.message.answer(selected_text, parse_mode="HTML")
+                    await state.update_data(selected_message_id=sent_message.message_id)
+            except AiogramError as e:
+                if "message is not modified" in str(e):
+                    logging.debug("Selected message not modified")
+                else:
+                    sent_message = await callback.message.answer(selected_text, parse_mode="HTML")
+                    await state.update_data(selected_message_id=sent_message.message_id)
 
-        # Обновление UI после сохранения
+            current_menu_text = data.get("current_menu_text", "")
+            if current_menu_text != "Выберите параметры:":
+                try:
+                    await callback.message.edit_text("Выберите параметры:", reply_markup=inline_kb)
+                    await state.update_data(current_menu_text="Выберите параметры:")
+                except AiogramError as e:
+                    if "message is not modified" in str(e):
+                        logging.debug("Menu not modified")
+                    else:
+                        raise
+            return  # Не обновляем finish_message для execute
+        elif subscription == "active":
+            await callback.answer("Данные сохранены!")
+            logging.debug(f"Handled active subscription for user_id={user_id}")
+
+        # Обновление UI только для None и active
         save_count += 1
         message_index = 0 if save_count == 1 else 1 + ((save_count - 2) % 5)
         finish_message_id = data.get("finish_message_id")
@@ -102,8 +124,8 @@ def register_save_delete(dp, bot):
         except AiogramError:
             sent_message = await callback.message.answer(finish_message, parse_mode="HTML")
             await state.update_data(finish_message_id=sent_message.message_id)
+        logging.debug(f"Updated finish message for user_id={user_id}")
 
-        # Обновление сообщения с параметрами
         selected_text = get_selected_text(data)
         selected_message_id = data.get("selected_message_id")
         try:
@@ -119,7 +141,7 @@ def register_save_delete(dp, bot):
                 await state.update_data(selected_message_id=sent_message.message_id)
         except AiogramError as e:
             if "message is not modified" in str(e):
-                print("Сообщение с параметрами не изменилось.")
+                logging.debug("Selected message not modified")
             else:
                 sent_message = await callback.message.answer(selected_text, parse_mode="HTML")
                 await state.update_data(selected_message_id=sent_message.message_id)
@@ -131,9 +153,10 @@ def register_save_delete(dp, bot):
                 await state.update_data(current_menu_text="Выберите параметры:")
             except AiogramError as e:
                 if "message is not modified" in str(e):
-                    print("Меню не изменилось, пропускаем редактирование.")
+                    logging.debug("Menu not modified")
                 else:
                     raise
+        logging.debug(f"Finished save_data for user_id={user_id}")
 
     @dp.callback_query(F.data == "button_delete")
     async def delete_data(callback: types.CallbackQuery, state: FSMContext):
