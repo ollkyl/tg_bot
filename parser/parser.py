@@ -248,7 +248,7 @@ async def process_new_ads():
                                 furnishing = await get_furnishing_from_html(session, external_id)
 
                             amenities = detail_hit.get("amenities_l3", [])
-                            info = ", ".join(amenities) if amenities else "Нет удобств"
+                            info = ", ".join(amenities) if amenities else "в объявлении не указано"
                             logging.info(f"Удобства для {external_id}: {info}")
 
                             cover_id = detail_hit.get("coverPhoto", {}).get("externalID", "")

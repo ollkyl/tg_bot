@@ -70,7 +70,9 @@ async def send_apartment_notification(apartment_id):
             True: "меблированная",
             False: "немеблированная",
         }
-        furnishing = furnishing_translations.get(apt.furnishing, apt.furnishing or "Не указано")
+        furnishing = furnishing_translations.get(
+            apt.furnishing, apt.furnishing or "в объявлении не указано"
+        )
 
         name = apt.name
         price = apt.price
@@ -86,20 +88,21 @@ async def send_apartment_notification(apartment_id):
         elif period == "yearly":
             period = "от года"
         else:
-            period = "Не указано"
+            period = "в объявлении не указано"
 
-        info = apt.info or "Не указаны удобства"
+        uc_info = apt.info
+        info = uc_info.lower() or "в объявлении не указано"
         link = apt.link
         owner = apt.owner.replace(" ", "_")
 
         message = (
-            f"🏠 {name}\n"
-            f"💰 Цена в месяц: {price} AED\n"
-            f"🛏️ Комнаты: {rooms}\n"
-            f"📍 Район: {district}\n"
-            f"⌛ Период: {period}\n"
+            f"🏠 <b>{name}</b>\n"
+            f"<code>💰 Цена в месяц:</code> {price} AED\n"
+            f"<code>🛏️ Комнаты:</code> {rooms}\n"
+            f"<code>📍 Район:</code> {district}\n"
+            f"<code>⌛ Период:</code> {period}\n"
             f"🪑 {furnishing}\n"
-            f"ℹ️ Удобства: {info[:300] + '...' if len(info) > 300 else info}\n"
+            f"<code>ℹ️ Удобства:</code> {info[:300] + '...' if len(info) > 300 else info}\n"
             f"🔗 <a href='{link}'>Ссылка на объявление</a>\n"
             f"📞 {owner}"
         )

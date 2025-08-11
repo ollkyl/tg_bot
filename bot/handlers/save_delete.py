@@ -34,21 +34,12 @@ def register_save_delete(dp, bot):
         if subscription is None:
             await add_subscription(user_id=user_id, subscription_type="day")
             await callback.message.answer(
-                "📢ДЕЙСТВУЕТ ПРОБНАЯ ПОДПИСКА НА 1 ДЕНЬ",
+                "📢 ДЕЙСТВУЕТ ПРОБНАЯ ПОДПИСКА НА 1 ДЕНЬ",
                 reply_markup=main_menu,
                 parse_mode="HTML",
             )
         elif subscription == "execute":
-            await callback.message.answer(
-                "📢 <b>Необходима подписка для получения объявлений:</b>\n"
-                "▫️ <i>1 день</i> - <b>20</b>⭐   (40 рублей / 1.68 AED)\n"
-                "▫️ <i>неделя</i> - <b>50</b>⭐   (90 рублей / 4.2 AED)\n"
-                "▫️ <i>месяц</i> - <b>200</b>⭐   (360 рублей / 16.8 AED)\n\n",
-                reply_markup=main_menu,
-                parse_mode="HTML",
-            )
-
-            await callback.answer("Подписка требуется!")
+            # Сохраняем данные, даже если подписка истекла
             await add_client(
                 user_id,
                 min_price,
@@ -59,12 +50,23 @@ def register_save_delete(dp, bot):
                 user_name,
                 furnishing,
             )
+
+            await callback.message.answer(
+                "📢 <b>Необходима подписка для получения объявлений:</b>\n"
+                "▫️ <i>1 день</i> - <b>20</b>⭐   (40 рублей / 1.68 AED)\n"
+                "▫️ <i>неделя</i> - <b>50</b>⭐   (90 рублей / 4.2 AED)\n"
+                "▫️ <i>месяц</i> - <b>200</b>⭐   (360 рублей / 16.8 AED)\n\n",
+                reply_markup=main_menu,
+                parse_mode="HTML",
+            )
+            await callback.answer("Данные сохранены! Подписка требуется для получения объявлений.")
             return
 
         await add_client(
             user_id, min_price, max_price, count_of_rooms, district, period, user_name, furnishing
         )
         await callback.answer("Данные сохранены!")
+
         save_count += 1
         message_index = 0 if save_count == 1 else 1 + ((save_count - 2) % 5)
         finish_message_id = data.get("finish_message_id")
@@ -106,7 +108,6 @@ def register_save_delete(dp, bot):
                 sent_message = await callback.message.answer(selected_text, parse_mode="HTML")
                 await state.update_data(selected_message_id=sent_message.message_id)
 
-        # Проверка перед редактированием меню
         current_menu_text = data.get("current_menu_text", "")
         if current_menu_text != "Выберите параметры:":
             try:
