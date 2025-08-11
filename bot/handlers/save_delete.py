@@ -31,6 +31,7 @@ def register_save_delete(dp, bot):
         save_count = data.get("save_count", 0)
 
         subscription = await check_subscription(user_id)
+        print(f"DEBUG subscription={subscription}, user_id={user_id}")
 
         if subscription is None:
             await add_subscription(user_id=user_id, subscription_type="day")
