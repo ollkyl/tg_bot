@@ -59,65 +59,72 @@ def register_save_delete(dp, bot):
                 reply_markup=main_menu,
                 parse_mode="HTML",
             )
-            await callback.answer("Данные сохранены! Подписка требуется для получения объявлений.")
+            await callback.answer("Сохранено, но подписка не активна.")
             return
+        elif subscription == "active":
+            await add_client(
+                user_id,
+                min_price,
+                max_price,
+                count_of_rooms,
+                district,
+                period,
+                user_name,
+                furnishing,
+            )
+            await callback.answer("Данные сохранены!")
 
-        await add_client(
-            user_id, min_price, max_price, count_of_rooms, district, period, user_name, furnishing
-        )
-        await callback.answer("Данные сохранены!")
-
-        save_count += 1
-        message_index = 0 if save_count == 1 else 1 + ((save_count - 2) % 5)
-        finish_message_id = data.get("finish_message_id")
-        finish_message = finish_messages[message_index]
-        try:
-            if finish_message_id:
-                await bot.edit_message_text(
-                    text=finish_message,
-                    chat_id=callback.message.chat.id,
-                    message_id=finish_message_id,
-                    parse_mode="HTML",
-                )
-            else:
+            save_count += 1
+            message_index = 0 if save_count == 1 else 1 + ((save_count - 2) % 5)
+            finish_message_id = data.get("finish_message_id")
+            finish_message = finish_messages[message_index]
+            try:
+                if finish_message_id:
+                    await bot.edit_message_text(
+                        text=finish_message,
+                        chat_id=callback.message.chat.id,
+                        message_id=finish_message_id,
+                        parse_mode="HTML",
+                    )
+                else:
+                    sent_message = await callback.message.answer(finish_message, parse_mode="HTML")
+                    await state.update_data(finish_message_id=sent_message.message_id)
+                await state.update_data(save_count=save_count)
+            except AiogramError:
                 sent_message = await callback.message.answer(finish_message, parse_mode="HTML")
                 await state.update_data(finish_message_id=sent_message.message_id)
-            await state.update_data(save_count=save_count)
-        except AiogramError:
-            sent_message = await callback.message.answer(finish_message, parse_mode="HTML")
-            await state.update_data(finish_message_id=sent_message.message_id)
 
-        # Обновление сообщения с параметрами
-        selected_text = get_selected_text(data)
-        selected_message_id = data.get("selected_message_id")
-        try:
-            if selected_message_id:
-                await bot.edit_message_text(
-                    text=selected_text,
-                    chat_id=callback.message.chat.id,
-                    message_id=selected_message_id,
-                    parse_mode="HTML",
-                )
-            else:
-                sent_message = await callback.message.answer(selected_text, parse_mode="HTML")
-                await state.update_data(selected_message_id=sent_message.message_id)
-        except AiogramError as e:
-            if "message is not modified" in str(e):
-                print("Сообщение с параметрами не изменилось.")
-            else:
-                sent_message = await callback.message.answer(selected_text, parse_mode="HTML")
-                await state.update_data(selected_message_id=sent_message.message_id)
-
-        current_menu_text = data.get("current_menu_text", "")
-        if current_menu_text != "Выберите параметры:":
+            # Обновление сообщения с параметрами
+            selected_text = get_selected_text(data)
+            selected_message_id = data.get("selected_message_id")
             try:
-                await callback.message.edit_text("Выберите параметры:", reply_markup=inline_kb)
-                await state.update_data(current_menu_text="Выберите параметры:")
+                if selected_message_id:
+                    await bot.edit_message_text(
+                        text=selected_text,
+                        chat_id=callback.message.chat.id,
+                        message_id=selected_message_id,
+                        parse_mode="HTML",
+                    )
+                else:
+                    sent_message = await callback.message.answer(selected_text, parse_mode="HTML")
+                    await state.update_data(selected_message_id=sent_message.message_id)
             except AiogramError as e:
                 if "message is not modified" in str(e):
-                    print("Меню не изменилось, пропускаем редактирование.")
+                    print("Сообщение с параметрами не изменилось.")
                 else:
-                    raise
+                    sent_message = await callback.message.answer(selected_text, parse_mode="HTML")
+                    await state.update_data(selected_message_id=sent_message.message_id)
+
+            current_menu_text = data.get("current_menu_text", "")
+            if current_menu_text != "Выберите параметры:":
+                try:
+                    await callback.message.edit_text("Выберите параметры:", reply_markup=inline_kb)
+                    await state.update_data(current_menu_text="Выберите параметры:")
+                except AiogramError as e:
+                    if "message is not modified" in str(e):
+                        print("Меню не изменилось, пропускаем редактирование.")
+                    else:
+                        raise
 
     @dp.callback_query(F.data == "button_delete")
     async def delete_data(callback: types.CallbackQuery, state: FSMContext):

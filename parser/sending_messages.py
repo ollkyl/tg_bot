@@ -101,7 +101,7 @@ async def send_apartment_notification(apartment_id):
             f"<code>🛏️ Комнаты:</code> {rooms}\n"
             f"<code>📍 Район:</code> {district}\n"
             f"<code>⌛ Период:</code> {period}\n"
-            f"🪑 {furnishing}\n"
+            f"<code>🪑 Меблировка:</code> {furnishing}\n"
             f"<code>ℹ️ Удобства:</code> {info[:300] + '...' if len(info) > 300 else info}\n"
             f"🔗 <a href='{link}'>Ссылка на объявление</a>\n"
             f"📞 {owner}"
