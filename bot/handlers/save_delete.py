@@ -25,7 +25,8 @@ def register_save_delete(dp, bot):
         period = ", ".join(periods) if periods else None
         furnishing_list = data.get("furnishing", [])
         furnishing = None if len(furnishing_list) != 1 else furnishing_list[0] == "furnished"
-        user_id = data.get("user_id")
+        user_id = data.get("user_id") or callback.from_user.id
+
         user_name = data.get("user_name")
         save_count = data.get("save_count", 0)
 
@@ -130,7 +131,7 @@ def register_save_delete(dp, bot):
     async def delete_data(callback: types.CallbackQuery, state: FSMContext):
         data = await state.get_data()
 
-        user_id = data.get("user_id")
+        user_id = data.get("user_id") or callback.from_user.id
 
         user_name = data.get("user_name")
         selected_message_id = data.get("selected_message_id")
