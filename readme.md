@@ -9,7 +9,8 @@
 - **Проверка подписки**: Уведомления получают только пользователи с активной подпиской (`status="active)`.
 
 <img src="https://github.com/user-attachments/assets/0b65b8b0-e926-4871-a2b6-1995cdac9099" width="40%">
-<img width="568" height="1497" alt="image" src="https://github.com/user-attachments/assets/fab729e6-51d3-4b9f-be20-19b5c851a01c" />
+<img src="https://github.com/user-attachments/assets/fab729e6-51d3-4b9f-be20-19b5c851a01c" width="300" alt="image" />
+
 
 ## Установка
 1. **Зависимости**: Установите зависимости из `requirements.txt`:
