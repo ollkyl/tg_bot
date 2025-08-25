@@ -83,6 +83,14 @@ graph TD
     7 -->|Interacts with| 5
 ```
 
+## Proposed Solution
+Run three independent asyncio loops in separate threads:
+1. **Bot Loop** - Main thread
+2. **Parser Loop** - Separate thread
+3. **Worker Loop** - Separate thread
+
+## Architecture Diagram
+
 ```mermaid
 graph TD
     A[Main Process] --> B[Thread 1: Bot Loop]
