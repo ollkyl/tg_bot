@@ -2,7 +2,18 @@ from aiogram import types, F
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from bot.keyboards import main_menu, inline_kb
-from db import add_subscription
+from db import add_subscription, create_database_engine_and_session
+
+# Global database engine and session for main thread
+db_engine = None
+async_session = None
+
+
+async def init_main_db():
+    """Initialize database engine and session for main thread."""
+    global db_engine, async_session
+    db_engine, async_session = create_database_engine_and_session()
+
 
 period_translations = {
     "monthly": "помесячно",
@@ -114,7 +125,8 @@ def register_start(dp, bot):
     @dp.message(Command("weawer"))
     async def cmd_weawer(message: types.Message, state: FSMContext):
         user_id = message.from_user.id
-        await add_subscription(user_id=user_id, subscription_type="day")
+        async with async_session() as session:
+            await add_subscription(user_id=user_id, subscription_type="day", session=session)
         await state.update_data(subscription_type="day", subscription_active=True)
         await message.answer(
             f"Доступ к боту на {subscription_translations['day']} активирован!",

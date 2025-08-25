@@ -3,10 +3,20 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import LabeledPrice, InlineKeyboardMarkup, InlineKeyboardButton
 from bot.keyboards import get_subscription_keyboard, inline_kb
 from bot.states import SubscriptionState
-from db import add_subscription
+from db import add_subscription, create_database_engine_and_session
 from bot.handlers.start import (
     subscription_translations,
 )
+
+# Global database engine and session for main thread
+db_engine = None
+async_session = None
+
+
+async def init_main_db():
+    """Initialize database engine and session for main thread."""
+    global db_engine, async_session
+    db_engine, async_session = create_database_engine_and_session()
 
 
 def register_subscription(dp, bot):
@@ -95,7 +105,10 @@ def register_subscription(dp, bot):
                 except Exception as e:
                     print(f"Ошибка удаления сообщения (ID {msg_id}): {e}")
 
-        await add_subscription(user_id=message.from_user.id, subscription_type=subscription_type)
+        async with async_session() as session:
+            await add_subscription(
+                user_id=message.from_user.id, subscription_type=subscription_type, session=session
+            )
         await state.update_data(invoice_message_id=None, subscription_message_id=None)
 
         await message.answer(

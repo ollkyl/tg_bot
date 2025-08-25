@@ -3,9 +3,26 @@ from aiogram.utils.media_group import MediaGroupBuilder
 import logging
 import asyncio
 import aiohttp
-from db import async_session, Apartment, find_matching_clients, check_subscription
+from db import (
+    async_session,
+    Apartment,
+    find_matching_clients,
+    check_subscription,
+    create_database_engine_and_session,
+)
 from sqlalchemy.sql import select
 import os
+
+# Global database engine and session for this thread
+db_engine = None
+async_session = None
+
+
+async def init_sending_messages_db():
+    """Initialize database engine and session for sending messages thread."""
+    global db_engine, async_session
+    db_engine, async_session = create_database_engine_and_session()
+
 
 # Global bot instance will be passed as parameter
 
@@ -56,6 +73,11 @@ async def send_media_group(
 
 
 async def send_apartment_notification(bot: Bot, apartment_id):
+    # Initialize database for this thread if not already done
+    global async_session
+    if async_session is None:
+        await init_sending_messages_db()
+
     async with async_session() as session:
         apt = (
             (await session.execute(select(Apartment).where(Apartment.id == apartment_id)))
@@ -116,14 +138,14 @@ async def send_apartment_notification(bot: Bot, apartment_id):
             logging.info(f"[NOTIFY] Отправлено в канал для apartment_id={apartment_id}")
 
         # Отправка клиентам
-        matching_clients = await find_matching_clients(apt)
+        matching_clients = await find_matching_clients(apt, session)
         if matching_clients:
             sent_usernames = []
             for user_id, user_name in matching_clients:
                 if not user_id:
                     continue
                 # Проверка подписки
-                subscription = await check_subscription(user_id)
+                subscription = await check_subscription(user_id, session)
                 if subscription != "active":
                     logging.info(f"[NOTIFY] Пропуск: пользователь {user_id} без подписки")
                     continue

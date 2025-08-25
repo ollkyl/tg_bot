@@ -1,9 +1,16 @@
 from aiogram import Dispatcher
-from .start import register_start
+from .start import register_start, init_main_db as init_start_db
 from .filters import register_filters
-from .save_delete import register_save_delete
-from .subscription import register_subscription
+from .save_delete import register_save_delete, init_main_db as init_save_delete_db
+from .subscription import register_subscription, init_main_db as init_subscription_db
 from .broadcast import register_broadcast
+
+
+async def init_main_db():
+    """Initialize database for all handlers in main thread."""
+    await init_start_db()
+    await init_save_delete_db()
+    await init_subscription_db()
 
 
 def register_handlers(dp: Dispatcher, bot, ADMIN_ID: int):

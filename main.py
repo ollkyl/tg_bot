@@ -13,6 +13,7 @@ from db import Base, DATABASE_URL
 from dotenv import load_dotenv
 from pathlib import Path
 from bot.subscription_worker import subscription_expiration_worker
+from bot.handlers import init_main_db
 
 load_dotenv(dotenv_path=Path(".") / ".env")
 
@@ -82,6 +83,7 @@ async def main():
     logging.basicConfig(level=logging.INFO)
     await wait_for_postgres()
     await init_db()
+    await init_main_db()  # Initialize database for main thread
 
     # Start parser in separate thread
     parser_thread = threading.Thread(target=run_parser_in_thread, name="ParserThread", daemon=True)
