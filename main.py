@@ -64,14 +64,18 @@ async def on_shutdown(bot: Bot):
     logging.info("Webhook удален")
 
 
-def start_async_in_thread(coro_func, name: str):
-    def runner():
-        asyncio.run(coro_func())
+def run_parser_in_thread():
+    """Run parser in its own thread with independent event loop."""
+    parser_loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(parser_loop)
+    parser_loop.run_until_complete(main_parser())
 
-    thread = threading.Thread(target=runner, name=name, daemon=True)
-    thread.start()
-    logging.info(f" Запущен поток {name}")
-    return thread
+
+def run_worker_in_thread():
+    """Run worker in its own thread with independent event loop."""
+    worker_loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(worker_loop)
+    worker_loop.run_until_complete(subscription_expiration_worker())
 
 
 async def main():
@@ -79,15 +83,22 @@ async def main():
     await wait_for_postgres()
     await init_db()
 
+    # Start parser in separate thread
+    parser_thread = threading.Thread(target=run_parser_in_thread, name="ParserThread", daemon=True)
+    parser_thread.start()
+    logging.info("Запущен поток ParserThread")
+
+    # Start worker in separate thread
+    worker_thread = threading.Thread(target=run_worker_in_thread, name="WorkerThread", daemon=True)
+    worker_thread.start()
+    logging.info("Запущен поток WorkerThread")
+
+    # Bot runs in main thread
     bot = Bot(token=API_TOKEN)
     dp = Dispatcher(storage=MemoryStorage())
     register_handlers(dp, bot, ADMIN_ID)
 
     use_webhook = os.environ.get("USE_WEBHOOK", "False").lower() == "true"
-
-    # парсер и воркер в отдельных потоках
-    start_async_in_thread(main_parser, "ParserThread")
-    start_async_in_thread(subscription_expiration_worker, "WorkerThread")
 
     if use_webhook:
         app = web.Application()

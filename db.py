@@ -29,9 +29,18 @@ DB_PORT = os.getenv("DB_PORT")
 DB_NAME = os.getenv("DB_NAME")
 DATABASE_URL = f"postgresql+asyncpg://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
+# Global engine and session (for backward compatibility)
 engine = create_async_engine(DATABASE_URL, echo=False)
 async_session = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
+
 Base = declarative_base()
+
+
+def create_database_engine_and_session():
+    """Create a new database engine and session maker for a thread."""
+    engine = create_async_engine(DATABASE_URL, echo=False)
+    async_session = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
+    return engine, async_session
 
 
 class Client(Base):
@@ -79,147 +88,274 @@ class Subscription(Base):
 
 
 async def add_client(
-    user_id, min_price, max_price, rooms, district, period, user_name, furnishing=None
+    user_id, min_price, max_price, rooms, district, period, user_name, furnishing=None, session=None
 ):
     if isinstance(rooms, list):
         rooms = ", ".join(rooms) if rooms else None
     elif rooms is not None and not isinstance(rooms, str):
         raise ValueError("Параметр 'rooms' должен быть строкой или списком строк")
 
-    async with async_session() as session:
-        async with session.begin():
-            # Проверяем, есть ли запись с user_id и status="Y"
-            query = select(Client).where(Client.user_id == user_id, Client.status == "Y")
-            result = await session.execute(query)
-            existing_client = result.scalars().first()
+    # Use provided session or create new one
+    if session is None:
+        session_manager = async_session()
+        async with session_manager as session:
+            result = await _add_client_impl(
+                user_id,
+                min_price,
+                max_price,
+                rooms,
+                district,
+                period,
+                user_name,
+                furnishing,
+                session,
+            )
+            await session.commit()
+            return result
+    else:
+        # When session is provided, we're in a transaction context
+        return await _add_client_impl(
+            user_id, min_price, max_price, rooms, district, period, user_name, furnishing, session
+        )
 
-            if user_name is None:
-                user_name = "username"
 
-            if existing_client:
-                # Обновляем существующую запись
-                await session.execute(
-                    update(Client)
-                    .where(Client.user_id == user_id, Client.status == "Y")
-                    .values(
-                        min_price=min_price,
-                        max_price=max_price,
-                        rooms=rooms,
-                        district=district,
-                        period=period,
-                        furnishing=furnishing,
-                        user_name=user_name,
-                        status="Y",
-                    )
-                )
-            else:
-                # Создаём новую запись, если нет существующей
-                new_client = Client(
-                    user_id=user_id,
-                    min_price=min_price,
-                    max_price=max_price,
-                    rooms=rooms,
-                    district=district,
-                    period=period,
-                    furnishing=furnishing,
-                    status="Y",
-                    user_name=user_name,
-                )
-                session.add(new_client)
-        await session.commit()
+async def _add_client_impl(
+    user_id, min_price, max_price, rooms, district, period, user_name, furnishing, session
+):
+    # Проверяем, есть ли запись с user_id и status="Y"
+    query = select(Client).where(Client.user_id == user_id, Client.status == "Y")
+    result = await session.execute(query)
+    existing_client = result.scalars().first()
+
+    if user_name is None:
+        user_name = "username"
+
+    if existing_client:
+        # Обновляем существующую запись
+        await session.execute(
+            update(Client)
+            .where(Client.user_id == user_id, Client.status == "Y")
+            .values(
+                min_price=min_price,
+                max_price=max_price,
+                rooms=rooms,
+                district=district,
+                period=period,
+                furnishing=furnishing,
+                user_name=user_name,
+                status="Y",
+            )
+        )
+    else:
+        # Создаём новую запись, если нет существующей
+        new_client = Client(
+            user_id=user_id,
+            min_price=min_price,
+            max_price=max_price,
+            rooms=rooms,
+            district=district,
+            period=period,
+            furnishing=furnishing,
+            status="Y",
+            user_name=user_name,
+        )
+        session.add(new_client)
+    return new_client
 
 
 async def add_apartment(
-    owner, name, price, rooms, district, period, furnishing, info, photo_ids, object_id, link
+    owner,
+    name,
+    price,
+    rooms,
+    district,
+    period,
+    furnishing,
+    info,
+    photo_ids,
+    object_id,
+    link,
+    session=None,
 ):
-    async with async_session() as session:
-        async with session.begin():
-            new_apartment = Apartment(
-                owner=owner,
-                name=name,
-                price=price,
-                period=period,
-                rooms=rooms,
-                district=district,
-                furnishing=furnishing,
-                info=info,
-                photo_ids=photo_ids,
-                object_id=object_id,
-                link=link,
-            )
-            session.add(new_apartment)
-            await session.flush()
-            matching_clients = await find_matching_clients(new_apartment)
-        await session.commit()
-        return new_apartment.id, matching_clients
+    # Use provided session or create new one
+    if session is None:
+        session_manager = async_session()
+        async with session_manager as session:
+            async with session.begin():
+                result = await _add_apartment_impl(
+                    owner,
+                    name,
+                    price,
+                    rooms,
+                    district,
+                    period,
+                    furnishing,
+                    info,
+                    photo_ids,
+                    object_id,
+                    link,
+                    session,
+                )
+            await session.commit()
+            return result
+    else:
+        # When session is provided, we're in a transaction context
+        return await _add_apartment_impl(
+            owner,
+            name,
+            price,
+            rooms,
+            district,
+            period,
+            furnishing,
+            info,
+            photo_ids,
+            object_id,
+            link,
+            session,
+        )
 
 
-async def find_matching_clients(apartment):
-    async with async_session() as session:
-        query = select(Client).where(Client.status == "Y")  # Только активные клиенты
-        if apartment.price:
-            query = query.where(
-                ((Client.min_price <= apartment.price) | (Client.min_price == None))
-                & ((Client.max_price >= apartment.price) | (Client.max_price == None))
-            )
-        if apartment.rooms:
-            query = query.where((Client.rooms.contains(apartment.rooms)) | (Client.rooms == None))
-        if apartment.district:
-            query = query.where(
-                (Client.district.contains(apartment.district)) | (Client.district == None)
-            )
-        if apartment.period:
-            query = query.where(
-                (Client.period.contains(apartment.period)) | (Client.period == None)
-            )
-        if apartment.furnishing is not None:
-            query = query.where(
-                (Client.furnishing == apartment.furnishing) | (Client.furnishing == None)
-            )
-        result = await session.execute(query)
-        clients = result.scalars().all()
-        return [(client.user_id, client.user_name) for client in clients]
+async def _add_apartment_impl(
+    owner,
+    name,
+    price,
+    rooms,
+    district,
+    period,
+    furnishing,
+    info,
+    photo_ids,
+    object_id,
+    link,
+    session,
+):
+    new_apartment = Apartment(
+        owner=owner,
+        name=name,
+        price=price,
+        period=period,
+        rooms=rooms,
+        district=district,
+        furnishing=furnishing,
+        info=info,
+        photo_ids=photo_ids,
+        object_id=object_id,
+        link=link,
+    )
+    session.add(new_apartment)
+    await session.flush()
+    matching_clients = await find_matching_clients(new_apartment, session)
+    return new_apartment.id, matching_clients
 
 
-async def get_all_users():
-    async with async_session() as session:
+async def find_matching_clients(apartment, session=None):
+    # Use provided session or create new one
+    if session is None:
+        session_manager = async_session()
+        async with session_manager as session:
+            return await _find_matching_clients_impl(apartment, session)
+    else:
+        # When session is provided, use it directly
+        return await _find_matching_clients_impl(apartment, session)
+
+
+async def _find_matching_clients_impl(apartment, session):
+    query = select(Client).where(Client.status == "Y")  # Только активные клиенты
+    if apartment.price:
+        query = query.where(
+            ((Client.min_price <= apartment.price) | (Client.min_price == None))
+            & ((Client.max_price >= apartment.price) | (Client.max_price == None))
+        )
+    if apartment.rooms:
+        query = query.where((Client.rooms.contains(apartment.rooms)) | (Client.rooms == None))
+    if apartment.district:
+        query = query.where(
+            (Client.district.contains(apartment.district)) | (Client.district == None)
+        )
+    if apartment.period:
+        query = query.where((Client.period.contains(apartment.period)) | (Client.period == None))
+    if apartment.furnishing is not None:
+        query = query.where(
+            (Client.furnishing == apartment.furnishing) | (Client.furnishing == None)
+        )
+    result = await session.execute(query)
+    clients = result.scalars().all()
+    return [(client.user_id, client.user_name) for client in clients]
+
+
+async def get_all_users(session=None):
+    # Use provided session or create new one
+    if session is None:
+        session_manager = async_session()
+        async with session_manager as session:
+            result = await session.execute(select(Client.user_id))
+            users = result.scalars().all()
+            return users
+    else:
+        # When session is provided, use it directly
         result = await session.execute(select(Client.user_id))
         users = result.scalars().all()
-    return users
+        return users
 
 
-async def add_subscription(user_id, subscription_type):
-    async with async_session() as session:
-        async with session.begin():
-            now = datetime.utcnow()
+async def add_subscription(user_id, subscription_type, session=None):
+    # Use provided session or create new one
+    if session is None:
+        session_manager = async_session()
+        async with session_manager as session:
+            async with session.begin():
+                await _add_subscription_impl(user_id, subscription_type, session)
+            await session.commit()
+    else:
+        # When session is provided, we're in a transaction context
+        await _add_subscription_impl(user_id, subscription_type, session)
 
-            duration = {
-                "day": timedelta(days=1),
-                "week": timedelta(days=7),
-                "month": timedelta(days=30),
-            }[subscription_type]
 
-            # 1. Деактивируем все старые
-            await session.execute(
-                update(Subscription)
-                .where(Subscription.user_id == user_id, Subscription.status == "active")
-                .values(status="expired")
+async def _add_subscription_impl(user_id, subscription_type, session):
+    now = datetime.utcnow()
+
+    duration = {
+        "day": timedelta(days=1),
+        "week": timedelta(days=7),
+        "month": timedelta(days=30),
+    }[subscription_type]
+
+    # 1. Деактивируем все старые
+    await session.execute(
+        update(Subscription)
+        .where(Subscription.user_id == user_id, Subscription.status == "active")
+        .values(status="expired")
+    )
+
+    # 2. Создаём новую
+    new_subscription = Subscription(
+        user_id=user_id,
+        subscription_type=subscription_type,
+        start_date=now,
+        end_date=now + duration,
+        status="active",
+    )
+    session.add(new_subscription)
+
+
+async def check_subscription(user_id, session=None):
+    # Use provided session or create new one
+    if session is None:
+        session_manager = async_session()
+        async with session_manager as session:
+            query = (
+                select(Subscription.status)
+                .where(Subscription.user_id == user_id)
+                .order_by(Subscription.end_date.desc())
+                .limit(1)
             )
-
-            # 2. Создаём новую
-            new_subscription = Subscription(
-                user_id=user_id,
-                subscription_type=subscription_type,
-                start_date=now,
-                end_date=now + duration,
-                status="active",
-            )
-            session.add(new_subscription)
-        await session.commit()
-
-
-async def check_subscription(user_id):
-    async with async_session() as session:
+            result = await session.execute(query)
+            status = result.scalar()
+            print(f"check_subscription for user_id={user_id}: status={status}")
+            return status
+    else:
+        # When session is provided, use it directly
         query = (
             select(Subscription.status)
             .where(Subscription.user_id == user_id)

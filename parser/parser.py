@@ -3,11 +3,12 @@ import aiohttp
 import os
 from datetime import datetime, timedelta
 import logging
-from db import add_apartment, async_session, Apartment
+from db import add_apartment, create_database_engine_and_session, Apartment
 from parser.sending_messages import send_apartment_notification
 from sqlalchemy.sql import select, delete
 import json
 from bs4 import BeautifulSoup
+from aiogram import Bot
 
 ALGOLIA_BASE_URL = os.getenv("ALGOLIA_BASE_URL")
 ALGOLIA_API_KEY = os.getenv("ALGOLIA_API_KEY")
@@ -47,6 +48,23 @@ existing_ids = set()
 if os.path.exists(ID_LIST_FILE):
     with open(ID_LIST_FILE, "r") as f:
         existing_ids = set(line.strip() for line in f if line.strip())
+
+# Global database engine and session for this thread
+db_engine = None
+async_session = None
+bot = None
+
+
+async def init_parser_db():
+    """Initialize database engine and session for parser thread."""
+    global db_engine, async_session
+    db_engine, async_session = create_database_engine_and_session()
+
+
+async def init_parser_bot():
+    """Initialize bot for parser thread."""
+    global bot
+    bot = Bot(token=os.getenv("API_TOKEN"))
 
 
 async def get_contact_phone_from_html(session, external_id):
@@ -271,13 +289,14 @@ async def process_new_ads():
                                 photo_ids,
                                 object_id,
                                 link,
+                                db_session,
                             )
                             logging.info(
                                 f"Сохранено в БД: ID={apartment_id}, Клиентов: {len(matching_clients)}, Link={link}"
                             )
                             stats["successful_adds"] += 1
 
-                            await send_apartment_notification(apartment_id)
+                            await send_apartment_notification(bot, apartment_id)
                         else:
                             logging.error(f"Ошибка API для external_id={external_id}: нет данных")
                         await asyncio.sleep(20)
@@ -292,6 +311,9 @@ async def process_new_ads():
 
 
 async def main_parser():
+    # Initialize database connection and bot for this thread
+    await init_parser_db()
+    await init_parser_bot()
     while True:
         await process_new_ads()
         await asyncio.sleep(CHECK_INTERVAL_MINUTES * 60)

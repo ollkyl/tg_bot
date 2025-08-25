@@ -7,7 +7,7 @@ from db import async_session, Apartment, find_matching_clients, check_subscripti
 from sqlalchemy.sql import select
 import os
 
-bot = Bot(token=os.getenv("API_TOKEN"))
+# Global bot instance will be passed as parameter
 
 
 async def is_url_accessible(url: str) -> bool:
@@ -24,7 +24,7 @@ def get_photo_urls(photo_ids: list[str], limit: int = 10) -> list[str]:
 
 
 async def send_media_group(
-    chat_id: str, photo_urls: list[str], message: str, max_attempts: int = 5
+    bot: Bot, chat_id: str, photo_urls: list[str], message: str, max_attempts: int = 5
 ):
     valid_photo_urls = [url for url in photo_urls if await is_url_accessible(url)]
     if not valid_photo_urls:
@@ -55,7 +55,7 @@ async def send_media_group(
     return False
 
 
-async def send_apartment_notification(apartment_id):
+async def send_apartment_notification(bot: Bot, apartment_id):
     async with async_session() as session:
         apt = (
             (await session.execute(select(Apartment).where(Apartment.id == apartment_id)))
@@ -112,7 +112,7 @@ async def send_apartment_notification(apartment_id):
         photo_urls = get_photo_urls(apt.photo_ids)
 
         # Отправка в канал
-        if await send_media_group(channel_id, photo_urls, message):
+        if await send_media_group(bot, channel_id, photo_urls, message):
             logging.info(f"[NOTIFY] Отправлено в канал для apartment_id={apartment_id}")
 
         # Отправка клиентам
@@ -127,7 +127,7 @@ async def send_apartment_notification(apartment_id):
                 if subscription != "active":
                     logging.info(f"[NOTIFY] Пропуск: пользователь {user_id} без подписки")
                     continue
-                if await send_media_group(user_id, photo_urls, message):
+                if await send_media_group(bot, user_id, photo_urls, message):
                     sent_usernames.append(user_name or "Без имени")
             if sent_usernames:
                 try:
