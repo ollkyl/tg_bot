@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import threading
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
@@ -63,6 +64,16 @@ async def on_shutdown(bot: Bot):
     logging.info("Webhook удален")
 
 
+def start_async_in_thread(coro_func, name: str):
+    def runner():
+        asyncio.run(coro_func())
+
+    thread = threading.Thread(target=runner, name=name, daemon=True)
+    thread.start()
+    logging.info(f" Запущен поток {name}")
+    return thread
+
+
 async def main():
     logging.basicConfig(level=logging.INFO)
     await wait_for_postgres()
@@ -73,6 +84,10 @@ async def main():
     register_handlers(dp, bot, ADMIN_ID)
 
     use_webhook = os.environ.get("USE_WEBHOOK", "False").lower() == "true"
+
+    # парсер и воркер в отдельных потоках
+    start_async_in_thread(main_parser, "ParserThread")
+    start_async_in_thread(subscription_expiration_worker, "WorkerThread")
 
     if use_webhook:
         app = web.Application()
@@ -92,10 +107,6 @@ async def main():
         await site.start()
         await on_startup(bot)
 
-        # Запускаем парсер и воркер как фоновые задачи
-        asyncio.create_task(main_parser())
-        asyncio.create_task(subscription_expiration_worker())
-
         try:
             await asyncio.Event().wait()  # Основной цикл для webhook
         finally:
@@ -107,25 +118,11 @@ async def main():
         logging.info("Webhook удалён для запуска polling")
         logging.info("Запуск в режиме polling, для локальной разработки")
         try:
-            # Запускаем polling в основном цикле для приоритета
-            await asyncio.gather(
-                dp.start_polling(bot),  # Бот в приоритете
-                background_task(main_parser),  # Парсер с задержкой
-                background_task(subscription_expiration_worker),  # Воркер с задержкой
-            )
+            await dp.start_polling(bot)  # бот крутится в основном потоке
         except Exception as e:
-            logging.error(f"Ошибка в polling или задачах: {e}")
+            logging.error(f"Ошибка в polling: {e}")
         finally:
             await bot.session.close()
-
-
-async def background_task(coro):
-    """Обёртка для фоновых задач с меньшим приоритетом"""
-    await asyncio.sleep(1)  # Даём боту запуститься первым
-    try:
-        await coro()
-    except Exception as e:
-        logging.error(f"Ошибка в фоновой задаче {coro.__name__}: {e}")
 
 
 if __name__ == "__main__":
